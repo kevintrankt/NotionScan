@@ -50,6 +50,14 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Auto mode", isOn: $settings.autoUploadEnabled)
+                } header: {
+                    Text("Capture")
+                } footer: {
+                    Text("When on, every photo you take is uploaded to your default database immediately — no review or confirmation. Each photo becomes its own page.")
+                }
+
+                Section {
                     Toggle("Save photos to library by default",
                            isOn: $settings.saveToPhotoLibraryByDefault)
                 } footer: {

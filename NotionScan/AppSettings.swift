@@ -29,6 +29,12 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(saveToPhotoLibraryByDefault, forKey: Keys.saveToLibrary) }
     }
 
+    /// When on, each captured photo is uploaded immediately (one page per photo),
+    /// skipping the review/confirmation step.
+    @Published var autoUploadEnabled: Bool {
+        didSet { defaults.set(autoUploadEnabled, forKey: Keys.autoUpload) }
+    }
+
     private let defaults = UserDefaults.standard
 
     private enum Keys {
@@ -36,6 +42,7 @@ final class AppSettings: ObservableObject {
         static let defaultDatabaseName = "defaultDatabaseName"
         static let workspaceName = "connectedWorkspaceName"
         static let saveToLibrary = "saveToPhotoLibraryByDefault"
+        static let autoUpload = "autoUploadEnabled"
     }
 
     init() {
@@ -44,6 +51,7 @@ final class AppSettings: ObservableObject {
         self.defaultDatabaseName = defaults.string(forKey: Keys.defaultDatabaseName)
         self.connectedWorkspaceName = defaults.string(forKey: Keys.workspaceName)
         self.saveToPhotoLibraryByDefault = defaults.bool(forKey: Keys.saveToLibrary)
+        self.autoUploadEnabled = defaults.bool(forKey: Keys.autoUpload)
     }
 
     /// True once a token exists. Drives Onboarding-vs-Camera routing.

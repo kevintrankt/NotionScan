@@ -12,8 +12,10 @@ import AVFoundation
 struct CameraView: View {
     @EnvironmentObject private var settings: AppSettings
     @StateObject private var camera = CameraModel()
+    @StateObject private var autoUploader = AutoUploadManager()
     @State private var showReview = false
     @State private var showSettings = false
+    @State private var showUploadedFlash = false
 
     var body: some View {
         ZStack {
@@ -28,6 +30,7 @@ struct CameraView: View {
 
             VStack {
                 topBar
+                autoModeBanner
                 Spacer()
                 bottomControls
             }
@@ -38,6 +41,25 @@ struct CameraView: View {
         }
         .onDisappear {
             camera.stop()
+        }
+        .onChange(of: camera.capturedPhotos.count) { _, newCount in
+            handleAutoUpload(newCount: newCount)
+        }
+        .onChange(of: autoUploader.lastSucceededAt) { _, newValue in
+            guard newValue != nil else { return }
+            showUploadedFlash = true
+            Task {
+                try? await Task.sleep(for: .seconds(1.5))
+                showUploadedFlash = false
+            }
+        }
+        .alert("Upload failed", isPresented: Binding(
+            get: { autoUploader.lastError != nil },
+            set: { if !$0 { autoUploader.lastError = nil } }
+        )) {
+            Button("OK", role: .cancel) { autoUploader.lastError = nil }
+        } message: {
+            Text(autoUploader.lastError ?? "")
         }
         .fullScreenCover(isPresented: $showReview, onDismiss: {
             Task { await camera.start() }
@@ -113,21 +135,64 @@ struct CameraView: View {
 
                 Spacer()
 
-                // Done (N)
-                Button {
-                    camera.stop()
-                    showReview = true
-                } label: {
-                    Text("Done (\(camera.capturedPhotos.count))")
-                        .font(.headline)
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 14)
-                        .frame(height: 56)
-                        .background(.white, in: Capsule())
+                if settings.autoUploadEnabled {
+                    // Keep the shutter centered; auto mode has no "Done" step.
+                    Color.clear.frame(width: 56, height: 56)
+                } else {
+                    // Done (N)
+                    Button {
+                        camera.stop()
+                        showReview = true
+                    } label: {
+                        Text("Done (\(camera.capturedPhotos.count))")
+                            .font(.headline)
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 14)
+                            .frame(height: 56)
+                            .background(.white, in: Capsule())
+                    }
+                    .opacity(camera.capturedPhotos.isEmpty ? 0.4 : 1)
+                    .disabled(camera.capturedPhotos.isEmpty)
                 }
-                .opacity(camera.capturedPhotos.isEmpty ? 0.4 : 1)
-                .disabled(camera.capturedPhotos.isEmpty)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var autoModeBanner: some View {
+        if settings.autoUploadEnabled {
+            HStack(spacing: 8) {
+                if autoUploader.inFlight > 0 {
+                    ProgressView().tint(.white)
+                    Text("Uploading \(autoUploader.inFlight)…")
+                } else if showUploadedFlash {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Text("Uploaded to Notion")
+                } else {
+                    Image(systemName: "bolt.fill").foregroundStyle(.yellow)
+                    Text("Auto mode")
+                }
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(.black.opacity(0.4), in: Capsule())
+            .padding(.top, 8)
+        }
+    }
+
+    private func handleAutoUpload(newCount: Int) {
+        guard settings.autoUploadEnabled, newCount > 0,
+              let client = settings.makeClient(),
+              let databaseID = settings.defaultDatabaseID else { return }
+        let photos = camera.capturedPhotos
+        camera.clearBatch()
+        for photo in photos {
+            autoUploader.enqueue(photo,
+                                 client: client,
+                                 databaseID: databaseID,
+                                 saveToPhotos: settings.saveToPhotoLibraryByDefault)
         }
     }
 

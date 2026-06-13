@@ -75,9 +75,10 @@ struct NotionClient: Sendable {
     }
 
     /// Creates one page in `databaseId` containing all uploaded images as blocks.
+    /// The title is set via the stable `"title"` property id, which works for any
+    /// database regardless of what its title column is named.
     @discardableResult
     func createBatchPage(databaseId: String,
-                         titlePropertyName: String,
                          title: String,
                          fileUploadIDs: [String]) async throws -> CreatePageResponse {
         let children = fileUploadIDs.map { id in
@@ -88,7 +89,7 @@ struct NotionClient: Sendable {
         let body = CreatePageRequest(
             parent: .init(database_id: databaseId),
             properties: [
-                titlePropertyName: .init(title: [.init(text: .init(content: title))])
+                "title": .init(title: [.init(text: .init(content: title))])
             ],
             children: children
         )

@@ -186,8 +186,7 @@ struct ReviewView: View {
 
     private func upload() async {
         guard let client = settings.makeClient(),
-              let databaseID = selectedDatabaseID,
-              let database = databases.first(where: { $0.id == databaseID }) else { return }
+              let databaseID = selectedDatabaseID else { return }
 
         let photos = camera.capturedPhotos
         let total = photos.count
@@ -205,7 +204,6 @@ struct ReviewView: View {
             let title = "NotionScan \(Self.titleFormatter.string(from: Date()))"
             try await client.createBatchPage(
                 databaseId: databaseID,
-                titlePropertyName: database.titlePropertyName,
                 title: title,
                 fileUploadIDs: fileUploadIDs
             )
