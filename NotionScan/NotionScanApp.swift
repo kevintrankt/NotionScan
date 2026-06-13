@@ -9,9 +9,12 @@ import SwiftUI
 
 @main
 struct NotionScanApp: App {
+    @StateObject private var settings = AppSettings()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(settings)
         }
     }
 }

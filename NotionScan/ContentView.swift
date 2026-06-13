@@ -2,23 +2,25 @@
 //  ContentView.swift
 //  NotionScan
 //
-//  Created by keb on 6/13/26.
+//  Root router: shows Onboarding until a token + default database are set,
+//  otherwise the Camera home screen.
 //
 
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject private var settings: AppSettings
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        if settings.isFullyConfigured {
+            CameraView()
+        } else {
+            OnboardingView()
         }
-        .padding()
     }
 }
 
 #Preview {
     ContentView()
+        .environmentObject(AppSettings())
 }
