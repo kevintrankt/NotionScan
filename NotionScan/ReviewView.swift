@@ -11,6 +11,7 @@ import SwiftUI
 struct ReviewView: View {
     @ObservedObject var camera: CameraModel
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var gallery: GalleryStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var databases: [NotionDatabase] = []
@@ -85,6 +86,7 @@ struct ReviewView: View {
 
                     Button {
                         camera.removePhoto(photo)
+                        gallery.delete(photo.id)
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title3)
@@ -202,11 +204,15 @@ struct ReviewView: View {
 
             uploadState = .creatingPage
             let title = "NotionScan \(Self.titleFormatter.string(from: Date()))"
-            try await client.createBatchPage(
+            let response = try await client.createBatchPage(
                 databaseId: databaseID,
                 title: title,
                 fileUploadIDs: fileUploadIDs
             )
+
+            for photo in photos {
+                gallery.markUploaded(photo.id, pageURL: response.url, databaseID: databaseID)
+            }
 
             if saveToPhotos {
                 await PhotoLibrarySaver.save(photos.map(\.image))

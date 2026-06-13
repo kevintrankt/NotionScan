@@ -20,6 +20,10 @@ final class CameraModel: NSObject, ObservableObject {
     @Published var flashMode: AVCaptureDevice.FlashMode = .off
     @Published private(set) var position: AVCaptureDevice.Position = .back
 
+    /// Called on the main actor for each captured photo. When set, the model does
+    /// not append to `capturedPhotos` itself — the handler decides what to do.
+    var onCapture: ((CapturedPhoto) -> Void)?
+
     let session = AVCaptureSession()
     private let output = AVCapturePhotoOutput()
     private let sessionQueue = DispatchQueue(label: "notionscan.camera.session")
@@ -142,7 +146,12 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         // Re-encode to a controlled JPEG quality for smaller, faster uploads.
         let jpeg = image.jpegData(compressionQuality: 0.8) ?? data
         Task { @MainActor in
-            self.capturedPhotos.append(CapturedPhoto(image: image, jpegData: jpeg))
+            let photo = CapturedPhoto(image: image, jpegData: jpeg)
+            if let onCapture = self.onCapture {
+                onCapture(photo)
+            } else {
+                self.capturedPhotos.append(photo)
+            }
         }
     }
 }

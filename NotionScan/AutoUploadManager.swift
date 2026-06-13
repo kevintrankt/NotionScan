@@ -4,11 +4,10 @@
 //
 //  Handles "auto mode": each captured photo is uploaded immediately as its own
 //  one-photo Notion page, with no review step. Uploads run sequentially so rapid
-//  captures don't race.
+//  captures don't race. The actual upload + status tracking lives in GalleryStore.
 //
 
 import Foundation
-import UIKit
 import Combine
 
 @MainActor
@@ -21,38 +20,44 @@ final class AutoUploadManager: ObservableObject {
     /// Most recent error message, if any.
     @Published var lastError: String?
 
-    private var queue: [CapturedPhoto] = []
+    private struct Job {
+        let itemID: UUID
+        let gallery: GalleryStore
+        let client: NotionClient
+        let databaseID: String
+        let saveToPhotos: Bool
+    }
+
+    private var queue: [Job] = []
     private var isProcessing = false
 
-    /// Enqueue a photo for immediate upload to `databaseID`.
-    func enqueue(_ photo: CapturedPhoto,
+    func enqueue(itemID: UUID,
+                 gallery: GalleryStore,
                  client: NotionClient,
                  databaseID: String,
                  saveToPhotos: Bool) {
-        queue.append(photo)
+        queue.append(Job(itemID: itemID,
+                         gallery: gallery,
+                         client: client,
+                         databaseID: databaseID,
+                         saveToPhotos: saveToPhotos))
         inFlight = queue.count + (isProcessing ? 1 : 0)
-        Task { await process(client: client, databaseID: databaseID, saveToPhotos: saveToPhotos) }
+        Task { await process() }
     }
 
-    private func process(client: NotionClient, databaseID: String, saveToPhotos: Bool) async {
+    private func process() async {
         guard !isProcessing else { return }
         isProcessing = true
         defer { isProcessing = false }
 
         while !queue.isEmpty {
-            let photo = queue.removeFirst()
+            let job = queue.removeFirst()
             inFlight = queue.count + 1
             do {
-                let fileID = try await client.uploadImage(photo.jpegData)
-                let title = "NotionScan \(Self.titleFormatter.string(from: Date()))"
-                try await client.createBatchPage(
-                    databaseId: databaseID,
-                    title: title,
-                    fileUploadIDs: [fileID]
-                )
-                if saveToPhotos {
-                    await PhotoLibrarySaver.save([photo.image])
-                }
+                try await job.gallery.upload(itemID: job.itemID,
+                                             client: job.client,
+                                             databaseID: job.databaseID,
+                                             saveToPhotos: job.saveToPhotos)
                 lastSucceededAt = Date()
                 lastError = nil
             } catch {
@@ -61,10 +66,4 @@ final class AutoUploadManager: ObservableObject {
             inFlight = queue.count
         }
     }
-
-    private static let titleFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return f
-    }()
 }

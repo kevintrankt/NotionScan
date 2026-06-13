@@ -11,10 +11,12 @@ import AVFoundation
 
 struct CameraView: View {
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var gallery: GalleryStore
     @StateObject private var camera = CameraModel()
     @StateObject private var autoUploader = AutoUploadManager()
     @State private var showReview = false
     @State private var showSettings = false
+    @State private var showGallery = false
     @State private var showUploadedFlash = false
 
     var body: some View {
@@ -37,13 +39,11 @@ struct CameraView: View {
             .padding()
         }
         .task {
+            configureCaptureHandler()
             await camera.start()
         }
         .onDisappear {
             camera.stop()
-        }
-        .onChange(of: camera.capturedPhotos.count) { _, newCount in
-            handleAutoUpload(newCount: newCount)
         }
         .onChange(of: autoUploader.lastSucceededAt) { _, newValue in
             guard newValue != nil else { return }
@@ -66,10 +66,16 @@ struct CameraView: View {
         }) {
             ReviewView(camera: camera)
                 .environmentObject(settings)
+                .environmentObject(gallery)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .environmentObject(settings)
+        }
+        .sheet(isPresented: $showGallery) {
+            GalleryView()
+                .environmentObject(settings)
+                .environmentObject(gallery)
         }
     }
 
@@ -89,15 +95,27 @@ struct CameraView: View {
 
             Spacer()
 
-            Button {
-                camera.stop()
-                showSettings = true
-            } label: {
-                Image(systemName: "gearshape.fill")
-                    .font(.title2)
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(.black.opacity(0.35), in: Circle())
+            HStack(spacing: 12) {
+                Button {
+                    showGallery = true
+                } label: {
+                    Image(systemName: "photo.stack.fill")
+                        .font(.title2)
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(.black.opacity(0.35), in: Circle())
+                }
+
+                Button {
+                    camera.stop()
+                    showSettings = true
+                } label: {
+                    Image(systemName: "gearshape.fill")
+                        .font(.title2)
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(.black.opacity(0.35), in: Circle())
+                }
             }
         }
     }
@@ -182,17 +200,25 @@ struct CameraView: View {
         }
     }
 
-    private func handleAutoUpload(newCount: Int) {
-        guard settings.autoUploadEnabled, newCount > 0,
-              let client = settings.makeClient(),
-              let databaseID = settings.defaultDatabaseID else { return }
-        let photos = camera.capturedPhotos
-        camera.clearBatch()
-        for photo in photos {
-            autoUploader.enqueue(photo,
-                                 client: client,
-                                 databaseID: databaseID,
-                                 saveToPhotos: settings.saveToPhotoLibraryByDefault)
+    /// Every captured photo is persisted to the gallery. In auto mode it's also
+    /// uploaded immediately; otherwise it joins the in-memory batch for review.
+    private func configureCaptureHandler() {
+        let gallery = self.gallery
+        let settings = self.settings
+        let autoUploader = self.autoUploader
+        camera.onCapture = { [weak camera] photo in
+            let item = gallery.add(photo)
+            if settings.autoUploadEnabled,
+               let client = settings.makeClient(),
+               let databaseID = settings.defaultDatabaseID {
+                autoUploader.enqueue(itemID: item.id,
+                                     gallery: gallery,
+                                     client: client,
+                                     databaseID: databaseID,
+                                     saveToPhotos: settings.saveToPhotoLibraryByDefault)
+            } else {
+                camera?.capturedPhotos.append(photo)
+            }
         }
     }
 
