@@ -68,7 +68,9 @@ struct CameraView: View {
                 .environmentObject(settings)
                 .environmentObject(gallery)
         }
-        .sheet(isPresented: $showSettings) {
+        .sheet(isPresented: $showSettings, onDismiss: {
+            Task { await camera.start() }
+        }) {
             SettingsView()
                 .environmentObject(settings)
         }
