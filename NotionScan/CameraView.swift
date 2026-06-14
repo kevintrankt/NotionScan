@@ -3,7 +3,8 @@
 //  NotionScan
 //
 //  Home screen: live camera, shutter, flash/flip, batch thumbnail strip,
-//  and a "Done" button that opens Review.
+//  a "Done" button that opens Review, and a last-photo preview that opens
+//  the Gallery.
 //
 
 import SwiftUI
@@ -97,35 +98,28 @@ struct CameraView: View {
 
             Spacer()
 
-            HStack(spacing: 12) {
-                Button {
-                    showGallery = true
-                } label: {
-                    Image(systemName: "photo.stack.fill")
-                        .font(.title2)
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .background(.black.opacity(0.35), in: Circle())
-                }
-
-                Button {
-                    camera.stop()
-                    showSettings = true
-                } label: {
-                    Image(systemName: "gearshape.fill")
-                        .font(.title2)
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .background(.black.opacity(0.35), in: Circle())
-                }
+            Button {
+                camera.stop()
+                showSettings = true
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.title2)
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(.black.opacity(0.35), in: Circle())
             }
         }
     }
 
     private var bottomControls: some View {
         VStack(spacing: 16) {
+            // The current batch (manual mode only) and its "Done" button travel
+            // together, since both act on the photos waiting to be reviewed.
             if !camera.capturedPhotos.isEmpty {
-                thumbnailStrip
+                HStack(spacing: 12) {
+                    thumbnailStrip
+                    doneButton
+                }
             }
 
             HStack {
@@ -155,26 +149,45 @@ struct CameraView: View {
 
                 Spacer()
 
-                if settings.autoUploadEnabled {
-                    // Keep the shutter centered; auto mode has no "Done" step.
-                    Color.clear.frame(width: 56, height: 56)
-                } else {
-                    // Done (N)
-                    Button {
-                        camera.stop()
-                        showReview = true
-                    } label: {
-                        Text("Done (\(camera.capturedPhotos.count))")
-                            .font(.headline)
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 14)
-                            .frame(height: 56)
-                            .background(.white, in: Capsule())
-                    }
-                    .opacity(camera.capturedPhotos.isEmpty ? 0.4 : 1)
-                    .disabled(camera.capturedPhotos.isEmpty)
-                }
+                // Last-photo preview → opens the gallery. Mirrors the system
+                // Camera app, where the most recent shot is the gallery entry point.
+                lastPhotoPreview
             }
+        }
+    }
+
+    private var doneButton: some View {
+        Button {
+            camera.stop()
+            showReview = true
+        } label: {
+            Text("Done (\(camera.capturedPhotos.count))")
+                .font(.headline)
+                .foregroundStyle(.black)
+                .padding(.horizontal, 14)
+                .frame(height: 56)
+                .background(.white, in: Capsule())
+        }
+    }
+
+    @ViewBuilder
+    private var lastPhotoPreview: some View {
+        if let item = gallery.items.first {
+            Button {
+                showGallery = true
+            } label: {
+                GalleryThumbnail(url: gallery.imageURL(for: item))
+                    .frame(width: 56, height: 56)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(.white, lineWidth: 2)
+                    )
+            }
+            .accessibilityLabel("Open gallery")
+        } else {
+            // No photos yet — keep the shutter centered.
+            Color.clear.frame(width: 56, height: 56)
         }
     }
 
