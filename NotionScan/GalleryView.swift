@@ -191,10 +191,10 @@ struct GalleryDetailView: View {
               let databaseID = settings.defaultDatabaseID else { return }
         isRetrying = true
         defer { isRetrying = false }
-        try? await gallery.upload(itemID: item.id,
-                                  client: client,
-                                  databaseID: databaseID,
-                                  saveToPhotos: settings.saveToPhotoLibraryByDefault)
+        _ = try? await gallery.upload(itemID: item.id,
+                                      client: client,
+                                      databaseID: databaseID,
+                                      saveToPhotos: settings.saveToPhotoLibraryByDefault)
     }
 
     private func statusText(_ status: UploadStatus) -> String {
