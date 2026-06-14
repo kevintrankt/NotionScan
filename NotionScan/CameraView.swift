@@ -33,7 +33,7 @@ struct CameraView: View {
 
             VStack {
                 topBar
-                autoModeBanner
+                autoModeToggle
                 Spacer()
                 bottomControls
             }
@@ -191,19 +191,30 @@ struct CameraView: View {
         }
     }
 
-    @ViewBuilder
-    private var autoModeBanner: some View {
-        if settings.autoUploadEnabled {
+    /// Tappable pill that toggles auto mode on and off. When on, it also surfaces
+    /// the current upload state (an in-flight count or a brief success flash); when
+    /// off it reads "Auto mode off" so there's always a control to turn it back on.
+    private var autoModeToggle: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                settings.autoUploadEnabled.toggle()
+            }
+        } label: {
             HStack(spacing: 8) {
-                if autoUploader.inFlight > 0 {
-                    ProgressView().tint(.white)
-                    Text("Uploading \(autoUploader.inFlight)…")
-                } else if showUploadedFlash {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                    Text("Uploaded to Notion")
+                if settings.autoUploadEnabled {
+                    if autoUploader.inFlight > 0 {
+                        ProgressView().tint(.white)
+                        Text("Uploading \(autoUploader.inFlight)…")
+                    } else if showUploadedFlash {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                        Text("Uploaded to Notion")
+                    } else {
+                        Image(systemName: "bolt.fill").foregroundStyle(.yellow)
+                        Text("Auto mode")
+                    }
                 } else {
-                    Image(systemName: "bolt.fill").foregroundStyle(.yellow)
-                    Text("Auto mode")
+                    Image(systemName: "bolt.slash.fill").foregroundStyle(.white.opacity(0.7))
+                    Text("Auto mode off")
                 }
             }
             .font(.subheadline.weight(.semibold))
@@ -211,8 +222,18 @@ struct CameraView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(.black.opacity(0.4), in: Capsule())
+            .overlay(
+                Capsule().stroke(
+                    settings.autoUploadEnabled ? Color.yellow.opacity(0.8) : Color.white.opacity(0.25),
+                    lineWidth: 1
+                )
+            )
             .padding(.top, 8)
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Auto mode")
+        .accessibilityValue(settings.autoUploadEnabled ? "On" : "Off")
+        .accessibilityHint("Toggles uploading each photo to Notion immediately")
     }
 
     /// Every captured photo is persisted to the gallery. In auto mode it's also
