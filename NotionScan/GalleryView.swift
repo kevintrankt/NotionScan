@@ -16,7 +16,11 @@ struct GalleryView: View {
 
     @State private var selectedItem: GalleryItem?
 
-    private let columns = [GridItem(.adaptive(minimum: 110), spacing: 4)]
+    /// A fixed three-column grid so every photo lands in a perfect row of three,
+    /// regardless of device width. `.flexible()` splits the available width evenly.
+    private static let gridSpacing: CGFloat = 4
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: Self.gridSpacing),
+                                count: 3)
 
     var body: some View {
         NavigationStack {
@@ -25,7 +29,7 @@ struct GalleryView: View {
                     emptyState
                 } else {
                     ScrollView {
-                        LazyVGrid(columns: columns, spacing: 4) {
+                        LazyVGrid(columns: columns, spacing: Self.gridSpacing) {
                             ForEach(gallery.items) { item in
                                 Button { selectedItem = item } label: {
                                     GalleryCell(item: item, url: gallery.imageURL(for: item))
@@ -33,7 +37,7 @@ struct GalleryView: View {
                                 .buttonStyle(.plain)
                             }
                         }
-                        .padding(4)
+                        .padding(Self.gridSpacing)
                     }
                 }
             }
@@ -66,10 +70,14 @@ private struct GalleryCell: View {
     let url: URL
 
     var body: some View {
-        GalleryThumbnail(url: url)
-            .aspectRatio(1, contentMode: .fill)
-            .frame(maxWidth: .infinity)
-            .clipped()
+        // `Color.clear` takes the full column width, and `.aspectRatio(1, .fit)`
+        // forces that width into a square. The thumbnail fills the square and is
+        // clipped, so every cell in the grid is identically sized.
+        Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                GalleryThumbnail(url: url)
+            }
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay(alignment: .bottomTrailing) {
                 StatusBadge(status: item.status)
