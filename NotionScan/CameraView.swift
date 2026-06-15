@@ -19,6 +19,7 @@ struct CameraView: View {
     @State private var showSettings = false
     @State private var showGallery = false
     @State private var showUploadedFlash = false
+    @State private var showDiscardConfirmation = false
 
     var body: some View {
         ZStack {
@@ -61,6 +62,16 @@ struct CameraView: View {
             Button("OK", role: .cancel) { autoUploader.lastError = nil }
         } message: {
             Text(autoUploader.lastError ?? "")
+        }
+        .confirmationDialog(
+            "Discard \(camera.capturedPhotos.count) photo\(camera.capturedPhotos.count == 1 ? "" : "s")?",
+            isPresented: $showDiscardConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Discard", role: .destructive) { discardBatch() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("These photos haven't been uploaded and will be removed.")
         }
         .fullScreenCover(isPresented: $showReview, onDismiss: {
             Task { await camera.start() }
@@ -113,10 +124,12 @@ struct CameraView: View {
 
     private var bottomControls: some View {
         VStack(spacing: 16) {
-            // The current batch (manual mode only) and its "Done" button travel
-            // together, since both act on the photos waiting to be reviewed.
+            // The current batch (manual mode only) travels with the controls that
+            // act on it: "Discard" throws the whole batch away, "Done" sends it to
+            // review. Both only make sense while photos are waiting to be reviewed.
             if !camera.capturedPhotos.isEmpty {
                 HStack(spacing: 12) {
+                    discardButton
                     thumbnailStrip
                     doneButton
                 }
@@ -168,6 +181,20 @@ struct CameraView: View {
                 .frame(height: 56)
                 .background(.white, in: Capsule())
         }
+    }
+
+    /// Throws away the whole pending batch. Confirmed first, since it's destructive.
+    private var discardButton: some View {
+        Button {
+            showDiscardConfirmation = true
+        } label: {
+            Image(systemName: "trash")
+                .font(.title2)
+                .foregroundStyle(.white)
+                .frame(width: 56, height: 56)
+                .background(.black.opacity(0.35), in: Circle())
+        }
+        .accessibilityLabel("Discard batch")
     }
 
     @ViewBuilder
@@ -234,6 +261,17 @@ struct CameraView: View {
         .accessibilityLabel("Auto mode")
         .accessibilityValue(settings.autoUploadEnabled ? "On" : "Off")
         .accessibilityHint("Toggles uploading each photo to Notion immediately")
+    }
+
+    /// Discards the entire pending batch. Each captured photo was also persisted
+    /// to the gallery as `pending` (see `configureCaptureHandler`), so we delete
+    /// those entries too — otherwise discarding would leave orphaned, never-uploaded
+    /// photos in the gallery. This mirrors the per-photo delete in Review.
+    private func discardBatch() {
+        for photo in camera.capturedPhotos {
+            gallery.delete(photo.id)
+        }
+        camera.clearBatch()
     }
 
     /// Every captured photo is persisted to the gallery. In auto mode it's also
