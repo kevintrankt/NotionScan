@@ -1,4 +1,4 @@
-# NotionCamera
+# NotionScanner
 
 Take photos and upload them straight into a Notion database. A batch of photos becomes one new row (page) in Notion, with every photo attached.
 
@@ -12,14 +12,14 @@ You write/edit code in Cursor, but you build and install the app with **Xcode** 
 
 ### 1. Open the project
 
-In Finder, double-click `NotionCamera.xcodeproj` (in this folder). It opens in Xcode with all files already included.
+In Finder, double-click `NotionScan.xcodeproj` (in this folder). It opens in Xcode with all files already included.
 
 ### 2. Set up signing (free Apple ID is fine)
 
 1. Xcode menu -> **Settings** -> **Accounts** -> **+** -> add your Apple ID.
-2. In the left sidebar, click the blue **NotionCamera** project -> select the **NotionCamera** target -> **Signing & Capabilities** tab.
+2. In the left sidebar, click the blue **NotionScan** project -> select the **NotionScan** target -> **Signing & Capabilities** tab.
 3. Check **Automatically manage signing**, and set **Team** to your name (Personal Team).
-4. If you see a "bundle identifier is not available" error, change **Bundle Identifier** to something unique, e.g. `com.yourname.notioncamera`.
+4. If you see a "bundle identifier is not available" error, change **Bundle Identifier** to something unique, e.g. `com.yourname.notionscanner`.
 
 > Note: with a free account the installed app stops working after ~7 days. Just press Run again from Xcode to refresh it.
 
@@ -56,7 +56,7 @@ The gear icon (top-left of the camera) lets you see your default database or dis
 
 | File | Responsibility |
 | --- | --- |
-| `NotionCameraApp.swift` | App entry; shows Onboarding until connected, then the Camera. |
+| `NotionScanApp.swift` | App entry; shows Onboarding until connected, then the Camera. |
 | `AppSettings.swift` | Connection state (token + default database). |
 | `KeychainStore.swift` | Stores the token securely in the Keychain. |
 | `NotionClient.swift` | All Notion API calls (validate, list databases, upload file, create page). |
