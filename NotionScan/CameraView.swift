@@ -28,9 +28,13 @@ struct CameraView: View {
             if camera.permissionDenied {
                 permissionDeniedView
             } else {
-                CameraPreviewView(session: camera.session) { devicePoint in
-                    camera.focus(at: devicePoint)
-                }
+                CameraPreviewView(
+                    session: camera.session,
+                    onTapToFocus: { devicePoint in camera.focus(at: devicePoint) },
+                    onPinchBegan: { camera.beginZoomGesture() },
+                    onPinchChanged: { scale in camera.updateZoomGesture(scale: scale) },
+                    onDoubleTap: { camera.resetZoom() }
+                )
                 .ignoresSafeArea()
             }
 
@@ -137,6 +141,8 @@ struct CameraView: View {
                 }
             }
 
+            zoomControls
+
             HStack {
                 // Flip camera
                 Button {
@@ -169,6 +175,45 @@ struct CameraView: View {
                 lastPhotoPreview
             }
         }
+    }
+
+    /// The lens picker (0.5× / 1× / 2× …) on multi-lens devices, or a small live zoom
+    /// pill on single-lens cameras so pinch-to-zoom still has feedback.
+    @ViewBuilder
+    private var zoomControls: some View {
+        if camera.showsLensSelector {
+            lensSelector
+        } else if camera.displayZoomFactor > 1.05 {
+            Text("\(camera.displayZoomLabel)×")
+                .font(.caption.weight(.semibold).monospacedDigit())
+                .foregroundStyle(.yellow)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.black.opacity(0.4), in: Capsule())
+        }
+    }
+
+    /// A row of lens buttons reflecting the iPhone's actual cameras. The active lens
+    /// shows the live zoom (e.g. "1.7×") in yellow; the others show their preset (e.g.
+    /// "0.5", "2"). Tapping a lens smoothly switches to it.
+    private var lensSelector: some View {
+        HStack(spacing: 6) {
+            ForEach(camera.lensOptions) { lens in
+                let isActive = camera.activeLens == lens
+                Button {
+                    camera.selectLens(lens)
+                } label: {
+                    Text(isActive ? "\(camera.displayZoomLabel)×" : lens.displayName)
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(isActive ? .yellow : .white)
+                        .frame(minWidth: isActive ? 40 : 30, minHeight: 30)
+                        .background(.black.opacity(0.35), in: Capsule())
+                }
+                .accessibilityLabel("\(lens.displayName)× lens")
+            }
+        }
+        .padding(4)
+        .background(.black.opacity(0.25), in: Capsule())
     }
 
     private var doneButton: some View {
