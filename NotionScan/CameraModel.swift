@@ -60,6 +60,38 @@ final class CameraModel: NSObject, ObservableObject {
         }
     }
 
+    /// Focus and meter exposure on a point the user tapped. `devicePoint` is in the
+    /// camera's normalized coordinate space (0,0 top-left … 1,1 bottom-right), which
+    /// the preview layer produces from a tap location. No-ops gracefully on hardware
+    /// that doesn't support a focus/exposure point of interest (e.g. some front cameras).
+    func focus(at devicePoint: CGPoint) {
+        guard isAuthorized else { return }
+        let session = self.session
+        sessionQueue.async {
+            guard let device = session.inputs
+                .compactMap({ ($0 as? AVCaptureDeviceInput)?.device })
+                .first else { return }
+            do {
+                try device.lockForConfiguration()
+                if device.isFocusPointOfInterestSupported {
+                    device.focusPointOfInterest = devicePoint
+                }
+                if device.isFocusModeSupported(.autoFocus) {
+                    device.focusMode = .autoFocus
+                }
+                if device.isExposurePointOfInterestSupported {
+                    device.exposurePointOfInterest = devicePoint
+                }
+                if device.isExposureModeSupported(.autoExpose) {
+                    device.exposureMode = .autoExpose
+                }
+                device.unlockForConfiguration()
+            } catch {
+                // Configuration can fail if the device is briefly unavailable; ignore.
+            }
+        }
+    }
+
     func flipCamera() {
         position = (position == .back) ? .front : .back
         let session = self.session
