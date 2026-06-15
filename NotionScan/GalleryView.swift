@@ -69,6 +69,8 @@ private struct GalleryCell: View {
     let item: GalleryItem
     let url: URL
 
+    private var isFailed: Bool { item.status == .failed }
+
     var body: some View {
         // `Color.clear` takes the full column width, and `.aspectRatio(1, .fit)`
         // forces that width into a square. The thumbnail fills the square and is
@@ -78,7 +80,17 @@ private struct GalleryCell: View {
             .overlay {
                 GalleryThumbnail(url: url)
             }
+            // A failed upload gets a red wash and border so it stands out in the
+            // grid at a glance — not just from the small corner badge.
+            .overlay {
+                if isFailed { Color.red.opacity(0.22) }
+            }
             .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                if isFailed {
+                    RoundedRectangle(cornerRadius: 6).stroke(.red, lineWidth: 2)
+                }
+            }
             .overlay(alignment: .bottomTrailing) {
                 StatusBadge(status: item.status)
                     .padding(5)

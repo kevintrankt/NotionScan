@@ -148,9 +148,24 @@ final class GalleryStore: ObservableObject {
             return
         }
         // Drop entries whose image file is gone.
-        items = decoded.filter {
+        var loaded = decoded.filter {
             FileManager.default.fileExists(atPath: imageURL(for: $0).path)
         }
+        // An upload only makes progress while the app is running — the async task
+        // that does the work dies with the process. So any item still marked
+        // `.uploading` (interrupted mid-upload) or `.pending` (captured but never
+        // sent) when we load at launch was stranded by the app closing. Surface
+        // these as `.failed` so they're flagged in the gallery and can be retried,
+        // instead of spinning forever or sitting silently un-uploaded.
+        var didReconcile = false
+        for index in loaded.indices
+        where loaded[index].status == .uploading || loaded[index].status == .pending {
+            loaded[index].status = .failed
+            loaded[index].errorMessage = Self.interruptedMessage
+            didReconcile = true
+        }
+        items = loaded
+        if didReconcile { save() }
     }
 
     private func save() {
@@ -158,6 +173,10 @@ final class GalleryStore: ObservableObject {
             try? data.write(to: metadataURL)
         }
     }
+
+    /// Shown on photos whose upload was cut short by the app closing (see `load`).
+    static let interruptedMessage =
+        "This photo wasn't uploaded before the app closed. Tap retry to upload it now."
 
     private static let titleFormatter: DateFormatter = {
         let f = DateFormatter()
