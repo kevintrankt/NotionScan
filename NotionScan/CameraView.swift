@@ -231,6 +231,9 @@ struct CameraView: View {
             .padding(.top, 8)
         }
         .buttonStyle(.plain)
+        // A short vibration confirms the toggle landed, since the pill is small
+        // and easy to tap without looking while shooting.
+        .sensoryFeedback(.impact, trigger: settings.autoUploadEnabled)
         .accessibilityLabel("Auto mode")
         .accessibilityValue(settings.autoUploadEnabled ? "On" : "Off")
         .accessibilityHint("Toggles uploading each photo to Notion immediately")
