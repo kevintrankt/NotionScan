@@ -6,7 +6,7 @@
 //  on its own queue; published state is updated on the main actor.
 //
 
-import AVFoundation
+@preconcurrency import AVFoundation
 import UIKit
 import Photos
 import Combine
