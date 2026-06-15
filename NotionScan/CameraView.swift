@@ -28,8 +28,10 @@ struct CameraView: View {
             if camera.permissionDenied {
                 permissionDeniedView
             } else {
-                CameraPreviewView(session: camera.session)
-                    .ignoresSafeArea()
+                CameraPreviewView(session: camera.session) { devicePoint in
+                    camera.focus(at: devicePoint)
+                }
+                .ignoresSafeArea()
             }
 
             VStack {
