@@ -99,6 +99,15 @@ struct NotionClient: Sendable {
         return try await send(request)
     }
 
+    /// Deletes a page by archiving it (moving it to Notion's trash) via
+    /// PATCH /v1/pages/{id} with `{"archived": true}` — the API equivalent of
+    /// deleting a page. Archiving an already-archived page is a no-op.
+    func deletePage(pageID: String) async throws {
+        var request = makeJSONRequest(path: "/v1/pages/\(pageID)", method: "PATCH")
+        request.httpBody = try JSONEncoder().encode(ArchivePageRequest())
+        let _: CreatePageResponse = try await send(request)
+    }
+
     // MARK: - Helpers
 
     private func makeJSONRequest(path: String, method: String) -> URLRequest {

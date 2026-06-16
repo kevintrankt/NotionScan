@@ -22,7 +22,10 @@ struct GalleryView: View {
     @State private var isSelecting = false
     @State private var selection = Set<UUID>()
     @State private var isRetrying = false
+    @State private var isDeleting = false
     @State private var showDeleteConfirmation = false
+    @State private var showDeleteFailure = false
+    @State private var deleteFailureMessage = ""
 
     /// A fixed three-column grid so every photo lands in a perfect row of three,
     /// regardless of device width. `.flexible()` splits the available width evenly.
@@ -53,8 +56,28 @@ struct GalleryView: View {
             .confirmationDialog(deleteConfirmationTitle,
                                 isPresented: $showDeleteConfirmation,
                                 titleVisibility: .visible) {
-                Button("Delete", role: .destructive) { deleteSelected() }
+                if selectionHasNotionPages {
+                    Button("Delete Photos & Notion Pages", role: .destructive) {
+                        Task { await deleteSelected(fromNotion: true) }
+                    }
+                    Button("Delete Photos Only", role: .destructive) {
+                        Task { await deleteSelected(fromNotion: false) }
+                    }
+                } else {
+                    Button("Delete", role: .destructive) {
+                        Task { await deleteSelected(fromNotion: false) }
+                    }
+                }
                 Button("Cancel", role: .cancel) {}
+            } message: {
+                if selectionHasNotionPages {
+                    Text("Some of these photos are uploaded to Notion. Choose whether to also delete their Notion pages.")
+                }
+            }
+            .alert("Couldn't delete from Notion", isPresented: $showDeleteFailure) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(deleteFailureMessage)
             }
             // A light tap of haptic feedback when selection mode turns on, since
             // it's triggered by an (invisible) long-press rather than a control.
@@ -88,7 +111,7 @@ struct GalleryView: View {
         if isSelecting {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { endSelecting() }
-                    .disabled(isRetrying)
+                    .disabled(isRetrying || isDeleting)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button(allSelected ? "Deselect All" : "Select All") {
@@ -98,7 +121,7 @@ struct GalleryView: View {
                         selection = Set(gallery.items.map(\.id))
                     }
                 }
-                .disabled(isRetrying)
+                .disabled(isRetrying || isDeleting)
             }
         } else {
             if !gallery.items.isEmpty {
@@ -119,10 +142,13 @@ struct GalleryView: View {
             Button(role: .destructive) {
                 showDeleteConfirmation = true
             } label: {
-                Label(selection.isEmpty ? "Delete" : "Delete (\(selection.count))",
-                      systemImage: "trash")
+                HStack(spacing: 6) {
+                    if isDeleting { ProgressView() }
+                    Label(selection.isEmpty ? "Delete" : "Delete (\(selection.count))",
+                          systemImage: "trash")
+                }
             }
-            .disabled(selection.isEmpty || isRetrying)
+            .disabled(selection.isEmpty || isRetrying || isDeleting)
 
             Spacer()
 
@@ -135,7 +161,7 @@ struct GalleryView: View {
                           systemImage: "arrow.up.circle")
                 }
             }
-            .disabled(failedSelectionCount == 0 || isRetrying || settings.defaultDatabaseID == nil)
+            .disabled(failedSelectionCount == 0 || isRetrying || isDeleting || settings.defaultDatabaseID == nil)
         }
         .padding(.horizontal)
         .padding(.vertical, 12)
@@ -171,6 +197,11 @@ struct GalleryView: View {
         return "Delete \(count) photo\(count == 1 ? "" : "s")?"
     }
 
+    /// True when at least one selected photo has a Notion page we could delete.
+    private var selectionHasNotionPages: Bool {
+        gallery.items.contains { selection.contains($0.id) && $0.notionPageID != nil }
+    }
+
     // MARK: - Actions
 
     private func handleTap(_ item: GalleryItem) {
@@ -200,9 +231,19 @@ struct GalleryView: View {
         selection.removeAll()
     }
 
-    private func deleteSelected() {
-        gallery.delete(selection)
+    private func deleteSelected(fromNotion: Bool) async {
+        let ids = selection
+        isDeleting = true
+        let failures = await gallery.delete(ids,
+                                            fromNotion: fromNotion,
+                                            client: fromNotion ? settings.makeClient() : nil)
+        isDeleting = false
         endSelecting()
+        if failures > 0 {
+            deleteFailureMessage = "\(failures) Notion page\(failures == 1 ? " couldn't" : "s couldn't") be deleted. "
+                + "\(failures == 1 ? "That photo is" : "Those photos are") still in your gallery so you can try again."
+            showDeleteFailure = true
+        }
     }
 
     private func retrySelected() async {
@@ -295,6 +336,10 @@ struct GalleryDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var isRetrying = false
+    @State private var isDeleting = false
+    @State private var showDeleteConfirmation = false
+    @State private var showDeleteFailure = false
+    @State private var deleteFailureMessage = ""
 
     private var item: GalleryItem? {
         gallery.items.first(where: { $0.id == itemID })
@@ -335,6 +380,32 @@ struct GalleryDetailView: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .confirmationDialog("Delete this photo?",
+                                isPresented: $showDeleteConfirmation,
+                                titleVisibility: .visible) {
+                if item?.notionPageID != nil {
+                    Button("Delete Photo & Notion Page", role: .destructive) {
+                        Task { await deleteItem(fromNotion: true) }
+                    }
+                    Button("Delete Photo Only", role: .destructive) {
+                        Task { await deleteItem(fromNotion: false) }
+                    }
+                } else {
+                    Button("Delete", role: .destructive) {
+                        Task { await deleteItem(fromNotion: false) }
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                if item?.notionPageID != nil {
+                    Text("This photo is uploaded to Notion. Choose whether to also delete its Notion page.")
+                }
+            }
+            .alert("Couldn't delete from Notion", isPresented: $showDeleteFailure) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(deleteFailureMessage)
+            }
         }
     }
 
@@ -372,16 +443,20 @@ struct GalleryDetailView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isRetrying || settings.defaultDatabaseID == nil)
+                .disabled(isRetrying || isDeleting || settings.defaultDatabaseID == nil)
             }
 
             Button(role: .destructive) {
-                gallery.delete(item.id)
-                dismiss()
+                showDeleteConfirmation = true
             } label: {
-                Label("Delete", systemImage: "trash").frame(maxWidth: .infinity)
+                HStack {
+                    if isDeleting { ProgressView() }
+                    Label("Delete", systemImage: "trash")
+                }
+                .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
+            .disabled(isRetrying || isDeleting)
         }
     }
 
@@ -394,6 +469,21 @@ struct GalleryDetailView: View {
                                       client: client,
                                       databaseID: databaseID,
                                       saveToPhotos: settings.saveToPhotoLibraryByDefault)
+    }
+
+    private func deleteItem(fromNotion: Bool) async {
+        isDeleting = true
+        let failures = await gallery.delete([itemID],
+                                            fromNotion: fromNotion,
+                                            client: fromNotion ? settings.makeClient() : nil)
+        isDeleting = false
+        if failures > 0 {
+            deleteFailureMessage = "This photo's Notion page couldn't be deleted. "
+                + "The photo is still in your gallery so you can try again."
+            showDeleteFailure = true
+        } else {
+            dismiss()
+        }
     }
 
     private func statusText(_ status: UploadStatus) -> String {
