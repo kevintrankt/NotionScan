@@ -21,6 +21,11 @@ struct CameraView: View {
     @State private var showUploadedFlash = false
     @State private var showDiscardConfirmation = false
 
+    /// Databases the integration can write to, used to populate the destination
+    /// picker. Loaded lazily when the camera appears (see `loadDatabases`).
+    @State private var databases: [NotionDatabase] = []
+    @State private var isLoadingDatabases = false
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -36,6 +41,7 @@ struct CameraView: View {
 
             VStack {
                 topBar
+                databaseSelector
                 autoModeToggle
                 Spacer()
                 bottomControls
@@ -45,6 +51,9 @@ struct CameraView: View {
         .task {
             configureCaptureHandler()
             await camera.start()
+        }
+        .task {
+            await loadDatabases()
         }
         .onDisappear {
             camera.stop()
@@ -220,6 +229,63 @@ struct CameraView: View {
         }
     }
 
+    /// Floating destination indicator above the Auto-mode pill. It always shows which
+    /// database the next photo will be saved to, and doubles as a picker: tapping it
+    /// opens a menu of the integration's databases so the destination can be switched
+    /// on the fly, without opening Settings. Both manual batches and Auto mode upload
+    /// to `settings.defaultDatabaseID`, so changing it here changes where photos land.
+    private var databaseSelector: some View {
+        Menu {
+            if databases.isEmpty {
+                Text(isLoadingDatabases ? "Loading…" : "No databases available")
+            } else {
+                ForEach(databases) { db in
+                    Button {
+                        settings.setDefaultDatabase(id: db.id, name: db.title)
+                    } label: {
+                        if db.id == settings.defaultDatabaseID {
+                            Label(db.title, systemImage: "checkmark")
+                        } else {
+                            Text(db.title)
+                        }
+                    }
+                }
+            }
+
+            Divider()
+
+            Button {
+                Task { await loadDatabases() }
+            } label: {
+                Label("Refresh databases", systemImage: "arrow.clockwise")
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "tray.full.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.7))
+                Text("Saving to")
+                    .foregroundStyle(.white.opacity(0.7))
+                Text(settings.defaultDatabaseName ?? "Choose database")
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
+                Image(systemName: "chevron.down")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+            .font(.footnote)
+            .lineLimit(1)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.black.opacity(0.4), in: Capsule())
+            .overlay(Capsule().stroke(.white.opacity(0.15), lineWidth: 1))
+            .padding(.top, 4)
+        }
+        .accessibilityLabel("Destination database")
+        .accessibilityValue(settings.defaultDatabaseName ?? "Not set")
+        .accessibilityHint("Choose which database photos are saved to")
+    }
+
     /// Tappable pill that toggles auto mode on and off. When on, it also surfaces
     /// the current upload state (an in-flight count or a brief success flash); when
     /// off it reads "Auto mode off" so there's always a control to turn it back on.
@@ -277,6 +343,19 @@ struct CameraView: View {
             gallery.delete(photo.id)
         }
         camera.clearBatch()
+    }
+
+    /// Fetches the databases the integration can write to, for the destination
+    /// picker. Failures leave the existing list untouched; the floating label still
+    /// shows the current default (from `settings`), so a network hiccup never hides
+    /// where photos are going — it just means the dropdown has nothing new to offer.
+    private func loadDatabases() async {
+        guard let client = settings.makeClient() else { return }
+        isLoadingDatabases = true
+        defer { isLoadingDatabases = false }
+        if let fetched = try? await client.listDatabases() {
+            databases = fetched
+        }
     }
 
     /// Every captured photo is persisted to the gallery. In auto mode it's also
