@@ -2,7 +2,23 @@
 
 Take photos and upload them straight into a Notion database. A batch of photos becomes one new row (page) in Notion, with every photo attached.
 
-Built with SwiftUI + AVFoundation. No backend: it talks directly to the Notion API using your personal Internal Integration Token, stored in the iOS Keychain.
+No backend: the app talks directly to the Notion API using your personal Internal Integration Token.
+
+## Two versions
+
+NotionScanner comes in two flavours that share the same product and the same Notion data model:
+
+| | iOS app (this folder + `NotionScan/`) | Web app ([`webapp/`](./webapp/)) |
+| --- | --- | --- |
+| Built with | SwiftUI + AVFoundation | Vanilla HTML/CSS/ES-module JS (no build step) |
+| Runs on | iPhone (Xcode build) | Any modern browser; deployable to **GitHub Pages** |
+| Token storage | iOS Keychain | `localStorage` |
+| Photo storage | JPEG files + JSON sidecar | IndexedDB (JPEG blobs + metadata) |
+| Talks to Notion | Directly (native apps ignore CORS) | Directly, **or** via an optional CORS proxy (Notion's API has no CORS headers) |
+
+Both have the same flow — onboarding, a camera home screen, per-batch review & upload, **Auto mode**, and a persistent gallery with upload status and retry. The web app is a faithful port of the iOS architecture; see [`webapp/README.md`](./webapp/README.md) for the full feature-parity notes, GitHub Pages deployment steps, and the one-file Cloudflare Worker that works around Notion's lack of CORS support.
+
+The rest of this document covers the **iOS app**.
 
 ---
 

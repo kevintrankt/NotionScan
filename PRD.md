@@ -144,3 +144,50 @@ No multi-user accounts, no team sharing, no App Store distribution required for 
 - Offline queue with automatic retry.
 - Document scanner (edge detection, perspective correction) via VisionKit.
 - Map extra Notion properties (e.g. a Date, a Category select) at upload time.
+
+## 13. Web app version (added post-v1)
+
+A fully client-side **web app** lives in [`webapp/`](./webapp/). It is a faithful
+port of the iOS app to the browser, intended to be hosted on **GitHub Pages** with
+no backend of any kind.
+
+### Goals
+- Same product as iOS: open → shoot → upload, with onboarding, review, Auto mode,
+  and a persistent gallery with per-photo upload status and retry.
+- 100% client-side: settings in `localStorage`, captured photos in IndexedDB. No
+  server owned by us; the browser talks to the Notion API directly.
+- Zero build step: plain HTML/CSS/ES-module JavaScript, so deployment is "copy the
+  folder to a static host".
+
+### Architecture parity
+Every iOS type has a JS counterpart with the same responsibility: `AppSettings`,
+`NotionClient`, `CameraModel`/`CameraPreviewView`, `GalleryStore`,
+`AutoUploadManager`, and one view module per iOS screen. See
+[`webapp/README.md`](./webapp/README.md) for the full mapping table.
+
+### Key constraint: Notion + CORS
+The Notion API does **not** send CORS headers, so a browser blocks direct calls to
+`https://api.notion.com` from a web page. (The native iOS app is unaffected — native
+apps don't enforce CORS.) The web app therefore makes the API base URL configurable:
+- Default is `https://api.notion.com` (works inside a native wrapper, or with browser
+  web-security disabled for local testing).
+- For real GitHub Pages use, deploy the included one-file **Cloudflare Worker**
+  (`webapp/cloudflare-worker/`) and set its URL in Settings → API proxy. The worker
+  forwards requests to Notion and adds the missing CORS headers. It stays "no backend
+  of our own" in spirit: it's a stateless, user-owned relay, not an app server.
+
+### Feature parity notes (browser limits, graceful degradation)
+- **Flash** uses the MediaStream `torch` constraint (supported on some mobile
+  browsers, not iOS Safari). The toggle still cycles off/on/auto for parity.
+- **Zoom/lens** uses the `zoom` track capability with pinch-to-zoom and
+  double-tap-to-reset; the lens picker shows zoom presets (the web can't enumerate
+  physical lenses).
+- **Tap-to-focus** attempts `pointsOfInterest`/`focusMode` and always shows the
+  reticle; focus itself is commonly a no-op in browsers.
+- **"Save to Photos"** becomes **"Save to device"** (a file download), since the web
+  has no Photos library.
+
+### Security note
+`localStorage` is not an encrypted keychain: the token is stored in plain text and is
+readable by any script on the origin. Acceptable for a personal, single-user, static
+deployment, but documented clearly and not suitable for a shared/public host.
