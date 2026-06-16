@@ -16,6 +16,14 @@ struct GalleryView: View {
 
     @State private var selectedItem: GalleryItem?
 
+    /// Multiselect state. Long-pressing a photo flips `isSelecting` on; while it's
+    /// on, a tap toggles a photo's membership in `selection` instead of opening
+    /// its detail sheet. `isRetrying` disables the controls during a mass retry.
+    @State private var isSelecting = false
+    @State private var selection = Set<UUID>()
+    @State private var isRetrying = false
+    @State private var showDeleteConfirmation = false
+
     /// A fixed three-column grid so every photo lands in a perfect row of three,
     /// regardless of device width. `.flexible()` splits the available width evenly.
     private static let gridSpacing: CGFloat = 4
@@ -28,38 +36,184 @@ struct GalleryView: View {
                 if gallery.items.isEmpty {
                     emptyState
                 } else {
-                    ScrollView {
-                        LazyVGrid(columns: columns, spacing: Self.gridSpacing) {
-                            ForEach(gallery.items) { item in
-                                Button { selectedItem = item } label: {
-                                    GalleryCell(item: item, url: gallery.imageURL(for: item))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(Self.gridSpacing)
-                    }
+                    grid
                 }
             }
-            .navigationTitle("Gallery")
+            .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
+            .toolbar { toolbarContent }
+            .safeAreaInset(edge: .bottom) {
+                if isSelecting { selectionBar }
             }
             .sheet(item: $selectedItem) { item in
                 GalleryDetailView(itemID: item.id)
                     .environmentObject(settings)
                     .environmentObject(gallery)
             }
+            .confirmationDialog(deleteConfirmationTitle,
+                                isPresented: $showDeleteConfirmation,
+                                titleVisibility: .visible) {
+                Button("Delete", role: .destructive) { deleteSelected() }
+                Button("Cancel", role: .cancel) {}
+            }
+            // A light tap of haptic feedback when selection mode turns on, since
+            // it's triggered by an (invisible) long-press rather than a control.
+            .sensoryFeedback(.selection, trigger: isSelecting)
         }
+    }
+
+    // MARK: - Grid
+
+    private var grid: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: Self.gridSpacing) {
+                ForEach(gallery.items) { item in
+                    GalleryCell(item: item,
+                                url: gallery.imageURL(for: item),
+                                isSelecting: isSelecting,
+                                isSelected: selection.contains(item.id))
+                        .contentShape(Rectangle())
+                        .onTapGesture { handleTap(item) }
+                        .onLongPressGesture(minimumDuration: 0.4) { beginSelecting(item) }
+                }
+            }
+            .padding(Self.gridSpacing)
+        }
+    }
+
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        if isSelecting {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Cancel") { endSelecting() }
+                    .disabled(isRetrying)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(allSelected ? "Deselect All" : "Select All") {
+                    if allSelected {
+                        selection.removeAll()
+                    } else {
+                        selection = Set(gallery.items.map(\.id))
+                    }
+                }
+                .disabled(isRetrying)
+            }
+        } else {
+            if !gallery.items.isEmpty {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Select") { withAnimation { isSelecting = true } }
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Done") { dismiss() }
+            }
+        }
+    }
+
+    // MARK: - Bottom action bar
+
+    private var selectionBar: some View {
+        HStack {
+            Button(role: .destructive) {
+                showDeleteConfirmation = true
+            } label: {
+                Label(selection.isEmpty ? "Delete" : "Delete (\(selection.count))",
+                      systemImage: "trash")
+            }
+            .disabled(selection.isEmpty || isRetrying)
+
+            Spacer()
+
+            Button {
+                Task { await retrySelected() }
+            } label: {
+                HStack(spacing: 6) {
+                    if isRetrying { ProgressView() }
+                    Label(failedSelectionCount == 0 ? "Retry" : "Retry (\(failedSelectionCount))",
+                          systemImage: "arrow.up.circle")
+                }
+            }
+            .disabled(failedSelectionCount == 0 || isRetrying || settings.defaultDatabaseID == nil)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 12)
+        .background(.bar)
     }
 
     private var emptyState: some View {
         ContentUnavailableView("No photos yet",
                                systemImage: "photo.on.rectangle.angled",
                                description: Text("Photos you capture will appear here with their upload status."))
+    }
+
+    // MARK: - Derived state
+
+    private var navigationTitle: String {
+        guard isSelecting else { return "Gallery" }
+        return selection.isEmpty ? "Select Photos" : "\(selection.count) Selected"
+    }
+
+    private var allSelected: Bool {
+        !gallery.items.isEmpty && selection.count == gallery.items.count
+    }
+
+    /// Selected photos whose upload failed — the ones "Retry" will act on.
+    private var failedSelectionCount: Int {
+        gallery.items.reduce(0) { count, item in
+            count + (selection.contains(item.id) && item.status == .failed ? 1 : 0)
+        }
+    }
+
+    private var deleteConfirmationTitle: String {
+        let count = selection.count
+        return "Delete \(count) photo\(count == 1 ? "" : "s")?"
+    }
+
+    // MARK: - Actions
+
+    private func handleTap(_ item: GalleryItem) {
+        if isSelecting {
+            toggle(item)
+        } else {
+            selectedItem = item
+        }
+    }
+
+    private func beginSelecting(_ item: GalleryItem) {
+        guard !isSelecting else { return }
+        withAnimation { isSelecting = true }
+        selection.insert(item.id)
+    }
+
+    private func toggle(_ item: GalleryItem) {
+        if selection.contains(item.id) {
+            selection.remove(item.id)
+        } else {
+            selection.insert(item.id)
+        }
+    }
+
+    private func endSelecting() {
+        withAnimation { isSelecting = false }
+        selection.removeAll()
+    }
+
+    private func deleteSelected() {
+        gallery.delete(selection)
+        endSelecting()
+    }
+
+    private func retrySelected() async {
+        guard let client = settings.makeClient(),
+              let databaseID = settings.defaultDatabaseID else { return }
+        isRetrying = true
+        defer { isRetrying = false }
+        _ = await gallery.retryFailed(ids: selection,
+                                      client: client,
+                                      databaseID: databaseID,
+                                      saveToPhotos: settings.saveToPhotoLibraryByDefault)
     }
 }
 
@@ -68,6 +222,8 @@ struct GalleryView: View {
 private struct GalleryCell: View {
     let item: GalleryItem
     let url: URL
+    var isSelecting: Bool = false
+    var isSelected: Bool = false
 
     private var isFailed: Bool { item.status == .failed }
 
@@ -85,9 +241,17 @@ private struct GalleryCell: View {
             .overlay {
                 if isFailed { Color.red.opacity(0.22) }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            // A selected photo is dimmed a touch so the blue check reads clearly.
             .overlay {
-                if isFailed {
+                if isSelected { Color.black.opacity(0.25) }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            // Selection wins the border over the failed state, so a selected
+            // failed photo still looks selected.
+            .overlay {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 6).stroke(.blue, lineWidth: 3)
+                } else if isFailed {
                     RoundedRectangle(cornerRadius: 6).stroke(.red, lineWidth: 2)
                 }
             }
@@ -95,6 +259,29 @@ private struct GalleryCell: View {
                 StatusBadge(status: item.status)
                     .padding(5)
             }
+            .overlay(alignment: .topLeading) {
+                if isSelecting {
+                    selectionIndicator
+                        .padding(5)
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var selectionIndicator: some View {
+        Group {
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, .blue)
+            } else {
+                Image(systemName: "circle")
+                    .foregroundStyle(.white)
+                    .background(.black.opacity(0.25), in: Circle())
+            }
+        }
+        .font(.title3)
+        .shadow(color: .black.opacity(0.3), radius: 1)
     }
 }
 

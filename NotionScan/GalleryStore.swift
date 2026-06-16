@@ -76,10 +76,18 @@ final class GalleryStore: ObservableObject {
     }
 
     func delete(_ id: UUID) {
-        if let item = items.first(where: { $0.id == id }) {
+        delete([id])
+    }
+
+    /// Removes several photos at once — their image files and metadata. Used by
+    /// the gallery's multiselect "Delete" action. A single `save()` at the end
+    /// keeps one write to disk no matter how many photos are removed.
+    func delete(_ ids: Set<UUID>) {
+        guard !ids.isEmpty else { return }
+        for item in items where ids.contains(item.id) {
             try? FileManager.default.removeItem(at: imageURL(for: item))
         }
-        items.removeAll { $0.id == id }
+        items.removeAll { ids.contains($0.id) }
         save()
     }
 
@@ -132,6 +140,34 @@ final class GalleryStore: ObservableObject {
                        error: (error as? NotionError)?.errorDescription ?? error.localizedDescription)
             throw error
         }
+    }
+
+    /// Retries every *failed* item in `ids`, one at a time so the uploads don't
+    /// race each other (mirroring auto mode's sequential queue in
+    /// `AutoUploadManager`). Items in `ids` that aren't failed are skipped, so
+    /// callers can pass a whole multiselect set without filtering first. Each
+    /// item's status updates live as it uploads. Returns the number that failed
+    /// again, so the caller can surface a summary if it wants to.
+    @discardableResult
+    func retryFailed(ids: Set<UUID>,
+                     client: NotionClient,
+                     databaseID: String,
+                     saveToPhotos: Bool) async -> Int {
+        // Snapshot the failed targets up front: `upload` mutates `items` as it
+        // runs, so iterating the live array while it changes would be fragile.
+        let targets = items.filter { ids.contains($0.id) && $0.status == .failed }
+        var failures = 0
+        for target in targets {
+            do {
+                _ = try await upload(itemID: target.id,
+                                     client: client,
+                                     databaseID: databaseID,
+                                     saveToPhotos: saveToPhotos)
+            } catch {
+                failures += 1
+            }
+        }
+        return failures
     }
 
     // MARK: - Private
