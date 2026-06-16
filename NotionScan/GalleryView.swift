@@ -213,6 +213,7 @@ struct GalleryView: View {
         _ = await gallery.retryFailed(ids: selection,
                                       client: client,
                                       databaseID: databaseID,
+                                      databaseName: settings.defaultDatabaseName,
                                       saveToPhotos: settings.saveToPhotoLibraryByDefault)
     }
 }
@@ -245,6 +246,10 @@ private struct GalleryCell: View {
             .overlay {
                 if isSelected { Color.black.opacity(0.25) }
             }
+            // A caption naming the destination database, so each uploaded photo
+            // shows where it landed at a glance. Added before `clipShape` so the
+            // gradient strip is clipped to the same rounded corners as the photo.
+            .overlay(alignment: .bottom) { databaseLabel }
             .clipShape(RoundedRectangle(cornerRadius: 6))
             // Selection wins the border over the failed state, so a selected
             // failed photo still looks selected.
@@ -282,6 +287,36 @@ private struct GalleryCell: View {
         }
         .font(.title3)
         .shadow(color: .black.opacity(0.3), radius: 1)
+    }
+
+    /// Bottom caption showing the destination database for an uploaded photo. Only
+    /// uploaded items carry a `databaseName`, so pending/failed photos show nothing.
+    @ViewBuilder
+    private var databaseLabel: some View {
+        if item.status == .uploaded, let name = item.databaseName, !name.isEmpty {
+            HStack(spacing: 3) {
+                Image(systemName: "tray.full.fill")
+                    .font(.system(size: 8))
+                Text(name)
+                    .font(.system(size: 9, weight: .semibold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                // Reserve room on the right so the caption never slides under the
+                // status badge pinned to the bottom-trailing corner.
+                Spacer(minLength: 18)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 5)
+            .padding(.top, 12)
+            .padding(.bottom, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                LinearGradient(colors: [.clear, .black.opacity(0.7)],
+                               startPoint: .top, endPoint: .bottom)
+            )
+            .accessibilityElement()
+            .accessibilityLabel("Uploaded to \(name)")
+        }
     }
 }
 
@@ -341,7 +376,7 @@ struct GalleryDetailView: View {
     private func statusRow(_ item: GalleryItem) -> some View {
         HStack {
             StatusBadge(status: item.status)
-            Text(statusText(item.status))
+            Text(statusText(item))
                 .font(.headline)
             Spacer()
             Text(item.createdAt, format: .dateTime.month().day().hour().minute())
@@ -393,14 +428,19 @@ struct GalleryDetailView: View {
         _ = try? await gallery.upload(itemID: item.id,
                                       client: client,
                                       databaseID: databaseID,
+                                      databaseName: settings.defaultDatabaseName,
                                       saveToPhotos: settings.saveToPhotoLibraryByDefault)
     }
 
-    private func statusText(_ status: UploadStatus) -> String {
-        switch status {
+    private func statusText(_ item: GalleryItem) -> String {
+        switch item.status {
         case .pending: return "Not uploaded"
         case .uploading: return "Uploading…"
-        case .uploaded: return "Uploaded to Notion"
+        case .uploaded:
+            if let name = item.databaseName, !name.isEmpty {
+                return "Uploaded to \(name)"
+            }
+            return "Uploaded to Notion"
         case .failed: return "Upload failed"
         }
     }

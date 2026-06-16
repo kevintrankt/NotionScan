@@ -25,6 +25,7 @@ final class AutoUploadManager: ObservableObject {
         let gallery: GalleryStore
         let client: NotionClient
         let databaseID: String
+        let databaseName: String?
         let saveToPhotos: Bool
     }
 
@@ -35,11 +36,13 @@ final class AutoUploadManager: ObservableObject {
                  gallery: GalleryStore,
                  client: NotionClient,
                  databaseID: String,
+                 databaseName: String?,
                  saveToPhotos: Bool) {
         queue.append(Job(itemID: itemID,
                          gallery: gallery,
                          client: client,
                          databaseID: databaseID,
+                         databaseName: databaseName,
                          saveToPhotos: saveToPhotos))
         inFlight = queue.count + (isProcessing ? 1 : 0)
         Task { await process() }
@@ -57,6 +60,7 @@ final class AutoUploadManager: ObservableObject {
                 try await job.gallery.upload(itemID: job.itemID,
                                              client: job.client,
                                              databaseID: job.databaseID,
+                                             databaseName: job.databaseName,
                                              saveToPhotos: job.saveToPhotos)
                 lastSucceededAt = Date()
                 lastError = nil

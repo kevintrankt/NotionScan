@@ -24,6 +24,10 @@ struct GalleryItem: Identifiable, Codable, Equatable {
     var imageFilename: String
     var status: UploadStatus
     var databaseID: String?
+    /// Human-readable name of the destination database, captured at upload time so
+    /// the gallery can show where a photo went without re-fetching the database list
+    /// (and so it survives even if the integration later loses access to it).
+    var databaseName: String?
     var pageURL: String?
     var errorMessage: String?
 }
@@ -68,6 +72,7 @@ final class GalleryStore: ObservableObject {
                                imageFilename: filename,
                                status: .pending,
                                databaseID: nil,
+                               databaseName: nil,
                                pageURL: nil,
                                errorMessage: nil)
         items.insert(item, at: 0)
@@ -95,11 +100,12 @@ final class GalleryStore: ObservableObject {
         update(id) { $0.status = .uploading; $0.errorMessage = nil }
     }
 
-    func markUploaded(_ id: UUID, pageURL: String?, databaseID: String?) {
+    func markUploaded(_ id: UUID, pageURL: String?, databaseID: String?, databaseName: String?) {
         update(id) {
             $0.status = .uploaded
             $0.pageURL = pageURL
             $0.databaseID = databaseID
+            $0.databaseName = databaseName
             $0.errorMessage = nil
         }
     }
@@ -116,6 +122,7 @@ final class GalleryStore: ObservableObject {
     func upload(itemID: UUID,
                 client: NotionClient,
                 databaseID: String,
+                databaseName: String?,
                 saveToPhotos: Bool) async throws -> CreatePageResponse {
         guard let item = items.first(where: { $0.id == itemID }),
               let jpeg = data(for: item) else {
@@ -133,7 +140,7 @@ final class GalleryStore: ObservableObject {
             if saveToPhotos, let image = UIImage(data: jpeg) {
                 await PhotoLibrarySaver.save([image])
             }
-            markUploaded(itemID, pageURL: response.url, databaseID: databaseID)
+            markUploaded(itemID, pageURL: response.url, databaseID: databaseID, databaseName: databaseName)
             return response
         } catch {
             markFailed(itemID,
@@ -152,6 +159,7 @@ final class GalleryStore: ObservableObject {
     func retryFailed(ids: Set<UUID>,
                      client: NotionClient,
                      databaseID: String,
+                     databaseName: String?,
                      saveToPhotos: Bool) async -> Int {
         // Snapshot the failed targets up front: `upload` mutates `items` as it
         // runs, so iterating the live array while it changes would be fragile.
@@ -162,6 +170,7 @@ final class GalleryStore: ObservableObject {
                 _ = try await upload(itemID: target.id,
                                      client: client,
                                      databaseID: databaseID,
+                                     databaseName: databaseName,
                                      saveToPhotos: saveToPhotos)
             } catch {
                 failures += 1

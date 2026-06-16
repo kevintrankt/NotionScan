@@ -190,6 +190,11 @@ struct ReviewView: View {
         guard let client = settings.makeClient(),
               let databaseID = selectedDatabaseID else { return }
 
+        // Resolve the destination's display name now, so the gallery can show
+        // where each photo went. Falls back to the cached default name.
+        let databaseName = databases.first(where: { $0.id == databaseID })?.title
+            ?? settings.defaultDatabaseName
+
         let photos = camera.capturedPhotos
         let total = photos.count
 
@@ -211,7 +216,7 @@ struct ReviewView: View {
             )
 
             for photo in photos {
-                gallery.markUploaded(photo.id, pageURL: response.url, databaseID: databaseID)
+                gallery.markUploaded(photo.id, pageURL: response.url, databaseID: databaseID, databaseName: databaseName)
             }
 
             if saveToPhotos {

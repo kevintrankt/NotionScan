@@ -418,6 +418,7 @@ struct CameraView: View {
                                      gallery: gallery,
                                      client: client,
                                      databaseID: databaseID,
+                                     databaseName: settings.defaultDatabaseName,
                                      saveToPhotos: settings.saveToPhotoLibraryByDefault)
             } else {
                 camera?.capturedPhotos.append(photo)
