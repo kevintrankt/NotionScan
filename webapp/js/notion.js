@@ -8,11 +8,12 @@
 //
 //  Browser caveat: the Notion API does not send CORS headers, so a browser
 //  blocks direct calls to https://api.notion.com. `baseURL` is therefore
-//  configurable: point it at a small CORS-friendly proxy (see
-//  webapp/cloudflare-worker) and every call is rewritten to go through it.
+//  configurable, and it defaults to a self-hosted local server (see
+//  webapp/local-server) rather than Notion itself, so the app works without
+//  hitting the CORS wall. Every call is rewritten onto whatever base is set.
 //
 
-import { DEFAULT_API_BASE_URL } from "./settings.js";
+import { DEFAULT_API_BASE_URL, NOTION_API_BASE_URL } from "./settings.js";
 
 const NOTION_VERSION = "2022-06-28";
 
@@ -150,9 +151,10 @@ export class NotionClient {
 
   /** Rewrites an absolute api.notion.com URL onto the configured base (for proxies). */
   _rewrite(url) {
-    if (this.baseURL === DEFAULT_API_BASE_URL) return url;
-    if (url.startsWith(DEFAULT_API_BASE_URL)) {
-      return this.baseURL + url.slice(DEFAULT_API_BASE_URL.length);
+    // When we're talking straight to Notion, its URLs are already correct.
+    if (this.baseURL === NOTION_API_BASE_URL) return url;
+    if (url.startsWith(NOTION_API_BASE_URL)) {
+      return this.baseURL + url.slice(NOTION_API_BASE_URL.length);
     }
     return url;
   }
@@ -170,10 +172,15 @@ export class NotionClient {
     try {
       response = await fetch(url, { method, headers, body });
     } catch (error) {
-      // A failed fetch with no response is almost always a CORS/preflight block
-      // when talking to api.notion.com directly. Surface targeted guidance.
-      if (this.baseURL === DEFAULT_API_BASE_URL) throw NotionError.cors();
-      throw NotionError.network(error?.message || "request failed");
+      // A failed fetch with no response talking *directly* to Notion is almost
+      // always a CORS/preflight block, so surface that targeted guidance.
+      // Through a proxy/local server (the default) it instead means the server
+      // is unreachable or its self-signed certificate hasn't been trusted yet.
+      if (this.baseURL === NOTION_API_BASE_URL) throw NotionError.cors();
+      throw NotionError.network(
+        `couldn't reach ${this.baseURL}. Is your proxy/local server running, and ` +
+          `have you accepted its certificate? (${error?.message || "request failed"})`
+      );
     }
 
     if (!response.ok) {

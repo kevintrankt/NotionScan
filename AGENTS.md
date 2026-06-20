@@ -22,9 +22,11 @@ behaviour in one, consider whether the other needs the same change** so they don
 - **No third-party dependencies.** The iOS app uses only `URLSession`; the web app uses
   only `fetch`; the local server uses only Node's standard library. Do not add packages,
   package managers, or a build step without explicit instruction.
-- **No backend of our own.** The client talks directly to `api.notion.com`. The only
-  server-side code is the *optional* CORS proxy in `webapp/cloudflare-worker/` and
-  `webapp/local-server/`, which is a stateless relay the user runs themselves.
+- **No backend of our own.** The iOS client talks directly to `api.notion.com`. The web
+  app can't (browsers enforce CORS), so it routes through a **self-hosted** proxy that the
+  *user* runs — `webapp/local-server/` (the shipped default) or `webapp/cloudflare-worker/`.
+  These are stateless relays we don't host; the web app's default address is the single
+  constant `DEFAULT_API_BASE_URL` in `webapp/js/settings.js`.
 - **The token is a secret.** It lives in the iOS Keychain / browser `localStorage` and is
   only ever sent to `api.notion.com`. Never log it, persist it elsewhere, or transmit it
   to any other host.
@@ -128,8 +130,12 @@ changes by building and by manual QA of the capture→upload loop.
   ```
 
 - To exercise live Notion calls from a browser you need a CORS proxy
-  (`webapp/cloudflare-worker/` or `webapp/local-server/`) set under **Settings → API
-  proxy**. `NotionClient`'s `baseURL` defaults to `https://api.notion.com`.
+  (`webapp/local-server/` or `webapp/cloudflare-worker/`). `NotionClient`'s `baseURL`
+  defaults to `DEFAULT_API_BASE_URL` (in `js/settings.js`), which points at the
+  self-hosted local server — **not** `api.notion.com` — so a fresh clone must repoint that
+  constant (or override it per-browser under **Settings → API proxy**) at its own server.
+  `js/settings.js` also keeps `NOTION_API_BASE_URL` (`https://api.notion.com`) purely for
+  rewriting upload URLs and detecting direct CORS-blocked calls.
 
 ### Manual QA checklist
 
