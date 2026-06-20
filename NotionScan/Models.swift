@@ -147,6 +147,13 @@ struct CreatePageResponse: Decodable {
     let url: String?
 }
 
+// MARK: - Notion API: archive (delete) page
+
+/// Body for PATCH /v1/pages/{id} that moves a page to the trash.
+struct ArchivePageRequest: Encodable {
+    let archived = true
+}
+
 // MARK: - Generic API error body
 
 struct NotionAPIErrorBody: Decodable {

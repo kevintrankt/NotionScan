@@ -211,7 +211,7 @@ struct ReviewView: View {
             )
 
             for photo in photos {
-                gallery.markUploaded(photo.id, pageURL: response.url, databaseID: databaseID)
+                gallery.markUploaded(photo.id, pageURL: response.url, pageID: response.id, databaseID: databaseID)
             }
 
             if saveToPhotos {

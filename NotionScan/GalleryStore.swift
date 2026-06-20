@@ -25,7 +25,25 @@ struct GalleryItem: Identifiable, Codable, Equatable {
     var status: UploadStatus
     var databaseID: String?
     var pageURL: String?
+    /// The Notion page id this photo was uploaded to, used to delete the page
+    /// from Notion. Optional decode keeps photos saved before this field existed
+    /// readable (they fall back to `notionPageID`, which parses the URL).
+    var pageID: String?
     var errorMessage: String?
+
+    /// The Notion page id to target when deleting from Notion: the stored id if
+    /// we have it, otherwise the trailing 32 hex characters of the page URL.
+    /// Notion page URLs end in the page's dashless id (e.g. `…/Title-<32 hex>`),
+    /// so older items uploaded before `pageID` was stored can still be deleted.
+    var notionPageID: String? {
+        if let pageID, !pageID.isEmpty { return pageID }
+        guard let pageURL,
+              let slug = pageURL.split(separator: "?").first?
+                  .split(separator: "/").last else { return nil }
+        let candidate = slug.suffix(32)
+        guard candidate.count == 32, candidate.allSatisfy(\.isHexDigit) else { return nil }
+        return String(candidate)
+    }
 }
 
 @MainActor
@@ -69,6 +87,7 @@ final class GalleryStore: ObservableObject {
                                status: .pending,
                                databaseID: nil,
                                pageURL: nil,
+                               pageID: nil,
                                errorMessage: nil)
         items.insert(item, at: 0)
         save()
@@ -91,14 +110,51 @@ final class GalleryStore: ObservableObject {
         save()
     }
 
+    /// Deletes the given photos locally and, when `fromNotion` is true, also
+    /// archives each one's Notion page (the API equivalent of deleting a page).
+    ///
+    /// Notion deletion is best-effort and done first, while we still hold each
+    /// page id. A photo whose page can't be archived is *kept* in the gallery so
+    /// the user can try again, rather than silently leaving an orphaned page in
+    /// Notion. Returns the number of Notion pages that failed to delete.
+    @discardableResult
+    func delete(_ ids: Set<UUID>, fromNotion: Bool, client: NotionClient?) async -> Int {
+        guard !ids.isEmpty else { return 0 }
+
+        var idsToRemove = ids
+        var failures = 0
+
+        if fromNotion, let client {
+            // Snapshot the targets up front: the per-page awaits below don't touch
+            // `items`, but reading it once keeps the intent clear.
+            let targets = items.filter { ids.contains($0.id) }
+                .compactMap { item -> (id: UUID, pageID: String)? in
+                    guard let pageID = item.notionPageID else { return nil }
+                    return (item.id, pageID)
+                }
+            for target in targets {
+                do {
+                    try await client.deletePage(pageID: target.pageID)
+                } catch {
+                    failures += 1
+                    idsToRemove.remove(target.id)
+                }
+            }
+        }
+
+        delete(idsToRemove)
+        return failures
+    }
+
     func markUploading(_ id: UUID) {
         update(id) { $0.status = .uploading; $0.errorMessage = nil }
     }
 
-    func markUploaded(_ id: UUID, pageURL: String?, databaseID: String?) {
+    func markUploaded(_ id: UUID, pageURL: String?, pageID: String?, databaseID: String?) {
         update(id) {
             $0.status = .uploaded
             $0.pageURL = pageURL
+            $0.pageID = pageID
             $0.databaseID = databaseID
             $0.errorMessage = nil
         }
@@ -133,7 +189,7 @@ final class GalleryStore: ObservableObject {
             if saveToPhotos, let image = UIImage(data: jpeg) {
                 await PhotoLibrarySaver.save([image])
             }
-            markUploaded(itemID, pageURL: response.url, databaseID: databaseID)
+            markUploaded(itemID, pageURL: response.url, pageID: response.id, databaseID: databaseID)
             return response
         } catch {
             markFailed(itemID,
