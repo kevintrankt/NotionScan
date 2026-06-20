@@ -68,7 +68,15 @@ export class OnboardingScreen {
       ]),
       el("section.card", {}, [
         el("h2.subtitle", { text: "How to get a token" }),
-        instructionRow(1, 'Open notion.so/my-integrations and click "New integration".'),
+        instructionRow(1, [
+          "Open ",
+          el(
+            "a",
+            { href: "https://www.notion.com/my-integrations", target: "_blank", rel: "noopener noreferrer" },
+            "notion.com/my-integrations"
+          ),
+          ' and click "New integration".',
+        ]),
         instructionRow(2, 'Choose "Internal", create it, then copy the Internal Integration Secret.'),
         instructionRow(
           3,
@@ -208,8 +216,11 @@ export class OnboardingScreen {
   }
 }
 
-function instructionRow(number, text) {
-  return el("div.instruction", {}, [el("span.step-number", { text: String(number) }), el("span", { text })]);
+// `content` is either a plain string or an array of nodes/strings, so an instruction
+// can embed a tappable link (e.g. the my-integrations URL) instead of dead text.
+function instructionRow(number, content) {
+  const body = typeof content === "string" ? el("span", { text: content }) : el("span", {}, content);
+  return el("div.instruction", {}, [el("span.step-number", { text: String(number) }), body]);
 }
 
 function spinner() {

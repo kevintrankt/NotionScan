@@ -92,7 +92,7 @@ that uploads just `webapp/` as the Pages artifact. That's the recommended path:
 
 ## Connect Notion (first launch)
 
-1. Go to [notion.so/my-integrations](https://www.notion.so/my-integrations) → **New integration** → **Internal** → create it.
+1. Go to [notion.com/my-integrations](https://www.notion.com/my-integrations) → **New integration** → **Internal** → create it.
 2. Copy the **Internal Integration Secret** (starts with `ntn_` or `secret_`).
 3. In Notion, open each **database** you want to upload to → top-right **•••** → **Connections** → add your integration.
 4. In the app: paste the token, **Connect**, then pick your **default database**.

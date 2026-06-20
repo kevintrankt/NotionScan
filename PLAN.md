@@ -166,7 +166,7 @@ license → let it install components.
 - First launch: approve the camera-permission prompt.
 
 ### G. Connect Notion (in the app, first launch)
-1. Go to <https://www.notion.so/my-integrations> → **New integration** → type
+1. Go to <https://www.notion.com/my-integrations> → **New integration** → type
    "Internal" → create → copy the **Internal Integration Secret** (starts with `ntn_`
    or `secret_`).
 2. Open each Notion **database** you want to upload to → top-right **•••** →
