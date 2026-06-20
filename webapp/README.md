@@ -49,11 +49,27 @@ python3 -m http.server 8000
 
 ## Deploy to GitHub Pages
 
+The app lives in the `webapp/` subfolder. GitHub Pages' "Deploy from a branch"
+option can only serve the repo **root** or **`/docs`** — it can't point at an
+arbitrary subfolder like `/webapp`. So the repo ships a GitHub Actions workflow
+([`.github/workflows/deploy-pages.yml`](../.github/workflows/deploy-pages.yml))
+that uploads just `webapp/` as the Pages artifact. That's the recommended path:
+
 1. Push this repo to GitHub.
-2. Repo **Settings → Pages → Build and deployment → Source: Deploy from a branch**.
-3. Pick your branch and set the folder to **`/webapp`** (or move `webapp/`'s contents to `/docs` and select that). Save.
+2. Repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+3. Push to `main` (or run the **Deploy web app to GitHub Pages** workflow from the
+   **Actions** tab via **Run workflow**). The workflow deploys `webapp/`.
 4. Your app is live at `https://YOUR_USERNAME.github.io/NotionScan/`.
-5. Deploy the Cloudflare Worker (above) and set the proxy URL in Settings so Notion calls succeed.
+5. Deploy the Cloudflare Worker (above) and set the proxy URL in Settings so
+   Notion calls succeed.
+
+> **Prefer "Deploy from a branch"?** Move `webapp/`'s contents into a top-level
+> `docs/` folder, then choose **Source: Deploy from a branch** and set the folder
+> to **`/docs`**. (You can delete the Actions workflow if you go this route.)
+
+> **Custom name?** This is a *project* page served from `https://USER.github.io/NotionScan/`,
+> so every asset path in the app is relative — don't change them to start with `/`
+> or the page will 404 under the `/NotionScan/` prefix.
 
 > Tip: if you set `ALLOWED_ORIGIN` on the Worker, use your exact Pages origin (`https://YOUR_USERNAME.github.io`).
 

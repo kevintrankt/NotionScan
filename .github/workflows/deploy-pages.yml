@@ -1,0 +1,50 @@
+name: Deploy web app to GitHub Pages
+
+# Publishes the static web app in `webapp/` to GitHub Pages.
+# GitHub Pages' "Deploy from a branch" option can only serve the repo root
+# or `/docs`, so we use an Actions workflow to upload just the `webapp/`
+# folder as the Pages artifact. The app then lives at the Pages root, e.g.
+# https://<owner>.github.io/NotionScan/
+
+on:
+  # Deploy on every push to main that touches the web app or this workflow.
+  push:
+    branches: [main]
+    paths:
+      - "webapp/**"
+      - ".github/workflows/deploy-pages.yml"
+  # Allow manual runs from the Actions tab.
+  workflow_dispatch:
+
+# Permissions required by the official Pages deploy action.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one Pages deployment at a time; let an in-progress run finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload the webapp/ folder as the Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: webapp
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
