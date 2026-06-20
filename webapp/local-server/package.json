@@ -1,0 +1,17 @@
+{
+  "name": "notionscan-local-server",
+  "version": "1.0.0",
+  "description": "Self-hosted CORS proxy + static host for the NotionScan web app. Zero dependencies.",
+  "type": "commonjs",
+  "main": "server.js",
+  "bin": {
+    "notionscan-server": "server.js"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

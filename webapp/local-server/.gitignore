@@ -1,0 +1,3 @@
+# Generated self-signed certificates — never commit private keys.
+certs/
+*.pem
