@@ -24,11 +24,12 @@ Settings live in `localStorage` exactly as requested; photo bytes live in Indexe
 
 The Notion API does **not** send CORS headers, so browsers block a web page from calling `https://api.notion.com` directly. (The native iOS app is unaffected — native apps don't enforce CORS.)
 
-You have three options:
+You have a few options:
 
-1. **Deploy the included Cloudflare Worker proxy** (recommended, free). See [`cloudflare-worker/`](./cloudflare-worker/). Paste its URL into **Settings → API proxy**. This keeps everything else client-side.
-2. **Run a browser with web security disabled** (development only), e.g. `open -na "Google Chrome" --args --disable-web-security --user-data-dir=/tmp/ns`.
-3. **Wrap the web app in a native shell** (Capacitor/Tauri), where CORS doesn't apply.
+1. **Deploy the included Cloudflare Worker proxy** (free, zero-maintenance). See [`cloudflare-worker/`](./cloudflare-worker/). Paste its URL into **Settings → API proxy**. This keeps everything else client-side.
+2. **Self-host the middleware on your own machine.** See [`local-server/`](./local-server/) — a one-file, zero-dependency Node server you can run on a home server (e.g. `192.168.86.239`). It proxies Notion *and* can serve this app over HTTPS from the same origin, which also makes the camera work on your phone.
+3. **Run a browser with web security disabled** (development only), e.g. `open -na "Google Chrome" --args --disable-web-security --user-data-dir=/tmp/ns`.
+4. **Wrap the web app in a native shell** (Capacitor/Tauri), where CORS doesn't apply.
 
 If a request is blocked, the app shows a clear CORS error pointing you here.
 

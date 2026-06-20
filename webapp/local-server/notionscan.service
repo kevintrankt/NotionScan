@@ -1,0 +1,36 @@
+# systemd unit to keep the NotionScan local server running and restart it on boot.
+#
+# 1. Edit the two paths below to match where you cloned the repo and your user.
+# 2. Install + start:
+#      sudo cp notionscan.service /etc/systemd/system/notionscan.service
+#      sudo systemctl daemon-reload
+#      sudo systemctl enable --now notionscan
+#      systemctl status notionscan
+#
+# Environment lines mirror the env vars documented in server.js / README.md.
+
+[Unit]
+Description=NotionScan local server (Notion CORS proxy + static host)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# The user/group to run as (not root). Change to your login user.
+User=pi
+Group=pi
+# Absolute path to the local-server folder inside your clone.
+WorkingDirectory=/home/pi/NotionScan/webapp/local-server
+ExecStart=/usr/bin/env node server.js
+Restart=on-failure
+RestartSec=3
+
+# --- Configuration (uncomment/edit as needed) ---
+Environment=PORT=8787
+Environment=HOST=0.0.0.0
+# Environment=ALLOWED_ORIGIN=https://YOUR_USERNAME.github.io
+# Environment=TLS_CERT=/home/pi/NotionScan/webapp/local-server/certs/cert.pem
+# Environment=TLS_KEY=/home/pi/NotionScan/webapp/local-server/certs/key.pem
+
+[Install]
+WantedBy=multi-user.target
