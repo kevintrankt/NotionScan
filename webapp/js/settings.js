@@ -25,8 +25,31 @@ const KEYS = {
   apiBaseUrl: "notionscan.apiBaseUrl",
 };
 
-/** The Notion API origin. Overridable so a user can route through their own proxy. */
-export const DEFAULT_API_BASE_URL = "https://api.notion.com";
+/**
+ * Notion's real API origin. A browser can't call this directly — Notion sends
+ * no CORS headers — so it isn't used as the default base URL. `notion.js` keeps
+ * it only for two internal jobs: rewriting the upload URL Notion hands back onto
+ * the configured base, and recognising a direct (CORS-prone) call so it can show
+ * targeted guidance. Don't change this; it's Notion's fixed address.
+ */
+export const NOTION_API_BASE_URL = "https://api.notion.com";
+
+/**
+ * Where the web app sends Notion API calls out of the box.
+ *
+ * Calling https://api.notion.com straight from the browser fails with a CORS
+ * error — the single biggest source of confusion when setting this app up. To
+ * avoid it, the default routes every call through a self-hosted local server
+ * (see webapp/local-server/) that forwards to Notion and adds the missing CORS
+ * headers. The address below is the project owner's home server.
+ *
+ * 👉 CLONING THIS PROJECT? This is the one place to change the local server's
+ *    location. Set it to YOUR server's address — scheme, host, and port, no
+ *    trailing slash, e.g. "https://192.168.1.50:8787". Everything else picks it
+ *    up automatically. You can also override it at runtime, without editing
+ *    code, under Settings → API proxy.
+ */
+export const DEFAULT_API_BASE_URL = "https://192.168.86.239:8787";
 
 export class AppSettings extends EventTarget {
   constructor() {

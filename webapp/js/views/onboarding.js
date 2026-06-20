@@ -93,9 +93,9 @@ export class OnboardingScreen {
         link.onclick = (e) => {
           e.preventDefault();
           this.app.toast(
-            "Notion's API can't be called directly from a web page (CORS). " +
-              "If you see a CORS error, deploy the included Cloudflare Worker and set its " +
-              "URL as the API proxy in Settings."
+            "Notion's API can't be called directly from a web page (CORS). NotionScan routes " +
+              "calls through a server you run — set its address under Settings → API proxy " +
+              "(see the local-server README), or deploy the included Cloudflare Worker."
           );
         };
       }

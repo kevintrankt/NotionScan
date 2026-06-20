@@ -24,14 +24,26 @@ Settings live in `localStorage` exactly as requested; photo bytes live in Indexe
 
 The Notion API does **not** send CORS headers, so browsers block a web page from calling `https://api.notion.com` directly. (The native iOS app is unaffected — native apps don't enforce CORS.)
 
-You have a few options:
+To keep that CORS error from being the first thing you hit, **the web app does not call Notion directly by default.** Instead it routes every API call through a [self-hosted local server](./local-server/) — a one-file, zero-dependency Node proxy you run on your own machine — which forwards to Notion and adds the missing CORS headers. That default address lives in one place:
 
-1. **Deploy the included Cloudflare Worker proxy** (free, zero-maintenance). See [`cloudflare-worker/`](./cloudflare-worker/). Paste its URL into **Settings → API proxy**. This keeps everything else client-side.
-2. **Self-host the middleware on your own machine.** See [`local-server/`](./local-server/) — a one-file, zero-dependency Node server you can run on a home server (e.g. `192.168.86.239`). It proxies Notion *and* can serve this app over HTTPS from the same origin, which also makes the camera work on your phone.
-3. **Run a browser with web security disabled** (development only), e.g. `open -na "Google Chrome" --args --disable-web-security --user-data-dir=/tmp/ns`.
-4. **Wrap the web app in a native shell** (Capacitor/Tauri), where CORS doesn't apply.
+```js
+// webapp/js/settings.js
+export const DEFAULT_API_BASE_URL = "https://192.168.86.239:8787";
+```
 
-If a request is blocked, the app shows a clear CORS error pointing you here.
+> ### 👉 Cloned this project? Point it at *your* server
+> The address above is the original author's home server and won't exist on your network. Change it to your own in **one** of two ways:
+> 1. **Edit the default in code** — set `DEFAULT_API_BASE_URL` in [`js/settings.js`](./js/settings.js) to your server's `scheme://host:port` (no trailing slash), e.g. `https://192.168.1.50:8787`. This is the single source of truth; everything else reads from it.
+> 2. **Override at runtime** — in the app, go to **Settings → API proxy**, paste your server's URL, and **Save**. This is stored per-browser in `localStorage` and overrides the code default without a redeploy.
+>
+> See [`local-server/`](./local-server/) for how to stand that server up (and serve the app from it over HTTPS so the camera works on your phone).
+
+Prefer not to run your own box? You still have the usual escape hatches:
+
+- **Deploy the included Cloudflare Worker proxy** (free, zero-maintenance). See [`cloudflare-worker/`](./cloudflare-worker/), then set its URL as the `DEFAULT_API_BASE_URL` (or under **Settings → API proxy**).
+- **Call Notion directly** by setting the base URL to `https://api.notion.com` — only works inside a **native shell** (Capacitor/Tauri) or a **browser with web security disabled** (development only), e.g. `open -na "Google Chrome" --args --disable-web-security --user-data-dir=/tmp/ns`.
+
+If a call to `https://api.notion.com` is blocked, the app shows a clear CORS error pointing you here; if your proxy/local server can't be reached, it names the address it tried so you can fix it.
 
 ---
 
@@ -60,8 +72,11 @@ that uploads just `webapp/` as the Pages artifact. That's the recommended path:
 3. Push to `main` (or run the **Deploy web app to GitHub Pages** workflow from the
    **Actions** tab via **Run workflow**). The workflow deploys `webapp/`.
 4. Your app is live at `https://YOUR_USERNAME.github.io/NotionScan/`.
-5. Deploy the Cloudflare Worker (above) and set the proxy URL in Settings so
-   Notion calls succeed.
+5. Make sure the API base URL points at a proxy you control — your
+   [`local-server`](./local-server/) or the [Cloudflare Worker](./cloudflare-worker/) —
+   either by editing `DEFAULT_API_BASE_URL` in [`js/settings.js`](./js/settings.js)
+   before you deploy, or per-browser under **Settings → API proxy**. (A Pages site is
+   HTTPS, so the proxy must be HTTPS too.)
 
 > **Prefer "Deploy from a branch"?** Move `webapp/`'s contents into a top-level
 > `docs/` folder, then choose **Source: Deploy from a branch** and set the folder

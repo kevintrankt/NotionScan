@@ -44,7 +44,7 @@ model**. Pick whichever fits how you want to run it.
 | Runs on | iPhone (build & install via Xcode) | Any modern browser; deployable to **GitHub Pages** |
 | Token storage | iOS Keychain | `localStorage` |
 | Photo storage | JPEG files + JSON sidecar | IndexedDB (JPEG blobs + metadata) |
-| Talks to Notion | Directly (native apps ignore CORS) | Directly, **or** via an optional CORS proxy |
+| Talks to Notion | Directly (native apps ignore CORS) | Through a CORS proxy you run — a self-hosted [local server](./webapp/local-server/) by default |
 | Dependencies | None (URLSession only) | None (`fetch` only) |
 
 The web app is a faithful, line-for-line port of the iOS architecture — every Swift type
@@ -53,11 +53,14 @@ has a JavaScript counterpart with the same responsibility (see the
 
 > **The web app's one catch: CORS.** The Notion API does not send CORS headers, so a
 > browser blocks a web page from calling `api.notion.com` directly. (Native iOS is
-> unaffected.) The web app therefore makes the API base URL configurable and ships two
-> ready-made proxies you can run yourself: a one-file
-> [Cloudflare Worker](./webapp/cloudflare-worker/) and a zero-dependency
-> [local Node server](./webapp/local-server/). Full details in the
-> [web README](./webapp/README.md).
+> unaffected.) To avoid making that error the first thing you see, the web app **routes
+> calls through a self-hosted proxy by default** rather than calling Notion directly. It
+> ships two ready-made proxies you can run yourself — a zero-dependency
+> [local Node server](./webapp/local-server/) (the default) and a one-file
+> [Cloudflare Worker](./webapp/cloudflare-worker/) — and the default address lives in a
+> single, well-marked constant (`DEFAULT_API_BASE_URL` in
+> [`webapp/js/settings.js`](./webapp/js/settings.js)) that you point at your own server
+> after cloning. Full details in the [web README](./webapp/README.md).
 
 ---
 
@@ -109,8 +112,13 @@ python3 -m http.server 8000
 # open http://localhost:8000  (localhost is a secure context, which the camera requires)
 ```
 
-To run it from a phone or deploy to GitHub Pages you'll also need a CORS proxy — see the
-[web README](./webapp/README.md) and [`webapp/local-server/`](./webapp/local-server/).
+The web app routes Notion calls through a proxy by default, and that proxy's address ships
+as the original author's home server. **After cloning, point it at your own** — edit
+`DEFAULT_API_BASE_URL` in [`webapp/js/settings.js`](./webapp/js/settings.js) (or override it
+per-browser in **Settings → API proxy**). The simplest setup runs the bundled
+[`webapp/local-server/`](./webapp/local-server/), which both proxies Notion and serves the
+app over HTTPS (so the camera works on a phone). Full details in the
+[web README](./webapp/README.md).
 
 ### Connect Notion (either version)
 

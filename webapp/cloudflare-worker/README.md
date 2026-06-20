@@ -4,7 +4,7 @@ The Notion API doesn't return [CORS](https://developer.mozilla.org/docs/Web/HTTP
 
 This folder is a **one-file Cloudflare Worker** that forwards requests to Notion and adds the missing CORS headers. It's free to deploy and means the NotionScan web app can run fully client-side from GitHub Pages.
 
-> **You only need this if you see a CORS error in the web app.** If you wrap the web app in a native shell (e.g. Capacitor) or run a browser with web security disabled for testing, you can skip it.
+> **This is one of two proxy options.** The web app routes through a proxy by default; the shipped default is the [self-hosted local server](../local-server/). Use this Worker instead if you'd rather not run your own box. (You can skip a proxy entirely only if you wrap the web app in a native shell, e.g. Capacitor, or run a browser with web security disabled for testing.)
 
 ## Deploy
 
@@ -12,7 +12,7 @@ This folder is a **one-file Cloudflare Worker** that forwards requests to Notion
 2. Install Wrangler: `npm install -g wrangler` then `wrangler login`.
 3. From this folder, run `wrangler deploy`.
 4. Copy the deployed URL, e.g. `https://notionscan-proxy.YOUR-NAME.workers.dev`.
-5. In NotionScan → **Settings → API proxy**, paste that URL and tap **Save proxy URL**.
+5. Point the app at it: either set `DEFAULT_API_BASE_URL` in [`../js/settings.js`](../js/settings.js) to that URL (the code default), or paste it under NotionScan → **Settings → API proxy** and tap **Save proxy URL** (per-browser override).
 
 That's it — every Notion call now flows through your Worker.
 

@@ -21,6 +21,22 @@ It is a single, **zero-dependency** Node script (`server.js`) that does two thin
 > HTTPS, and point the app's API proxy at the same address. One box, one origin,
 > camera works, no CORS, no mixed-content surprises.
 
+> ### This server *is* the web app's default
+> So new users don't slam into a CORS error, the web app ships with its API base
+> URL already pointing at this server rather than at `https://api.notion.com`. The
+> default address is set in **one place**:
+>
+> ```js
+> // webapp/js/settings.js
+> export const DEFAULT_API_BASE_URL = "https://192.168.86.239:8787";
+> ```
+>
+> If you cloned this project, your server almost certainly lives at a different
+> address. Make them match by either editing `DEFAULT_API_BASE_URL` to your
+> server's `scheme://host:port` (no trailing slash), or overriding it per-browser
+> under **Settings → API proxy**. The examples below use `192.168.86.239:8787` —
+> substitute your own address throughout.
+
 ---
 
 ## 1. Install Node.js on your local server
@@ -118,8 +134,10 @@ sudo ufw allow 8787/tcp           # Debian/Ubuntu
 1. On your phone (same Wi‑Fi), open **`https://192.168.86.239:8787`**.
 2. Your browser warns about the self-signed certificate — choose **Advanced →
    Proceed/Visit anyway**. (You only do this once per device.)
-3. The NotionScan app loads. Go to **Settings → API proxy** and set it to
-   **`https://192.168.86.239:8787`**, then **Save proxy URL**.
+3. The NotionScan app loads. It already targets this server by default, so if
+   you're serving from this same box at the shipped address there's nothing to
+   change. Otherwise go to **Settings → API proxy**, set it to your server's
+   address (e.g. **`https://192.168.86.239:8787`**), and **Save proxy URL**.
 4. Paste your Notion token, pick a database, and start scanning. Because the app
    and the proxy share one origin, Notion calls just work.
 

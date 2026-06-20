@@ -136,13 +136,15 @@ export class SettingsOverlay {
       spellcheck: false,
     });
     return el("section.card", {}, [
-      el("h3.subtitle", { text: "API proxy (advanced)" }),
+      el("h3.subtitle", { text: "API proxy" }),
       input,
       el("p.hint", {
         text:
           "Notion's API can't be called directly from a web page because it doesn't send CORS " +
-          "headers. Deploy the included Cloudflare Worker (see the README) and paste its URL here. " +
-          "Leave it as the default to call Notion directly (works in native wrappers or with CORS disabled).",
+          "headers. By default NotionScan routes calls through a local server you run yourself " +
+          "(see the local-server README) — point this at your own server's address, or at a " +
+          "deployed Cloudflare Worker, and press Save. Set it to https://api.notion.com only " +
+          "inside a native wrapper or a browser with web security disabled.",
       }),
       el("div.row.gap", {}, [
         el(
