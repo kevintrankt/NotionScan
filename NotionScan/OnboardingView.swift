@@ -49,7 +49,7 @@ struct OnboardingView: View {
             }
 
             Section("How to get a token") {
-                instructionRow(1, "Open notion.so/my-integrations and tap “New integration”.")
+                instructionRow(1, "Open [notion.com/my-integrations](https://www.notion.com/my-integrations) and tap “New integration”.")
                 instructionRow(2, "Choose “Internal”, create it, then copy the Internal Integration Secret.")
                 instructionRow(3, "In Notion, open each database you want to use → ••• → Connections → add your integration.")
             }
@@ -125,14 +125,16 @@ struct OnboardingView: View {
         }
     }
 
-    private func instructionRow(_ number: Int, _ text: String) -> some View {
+    // `text` is a `LocalizedStringKey` so Markdown links in the instructions render
+    // as tappable links (e.g. the my-integrations URL opens in the browser).
+    private func instructionRow(_ number: Int, _ text: LocalizedStringKey) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Text("\(number)")
                 .font(.caption.bold())
                 .foregroundStyle(.white)
                 .frame(width: 22, height: 22)
                 .background(.tint, in: Circle())
-            Text(text).font(.callout)
+            Text(text).font(.callout).tint(.accentColor)
         }
     }
 

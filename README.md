@@ -5,7 +5,7 @@ photos becomes one new row (page) in your chosen database, with every photo atta
 an image block. The whole loop is *open app → shoot → upload*.
 
 There is **no backend of our own**: the app talks directly to the Notion API using your
-personal [internal integration token](https://www.notion.so/my-integrations). Your token
+personal [internal integration token](https://www.notion.com/my-integrations). Your token
 never leaves the device except to call `api.notion.com`.
 
 > **Why it exists.** Getting a real-world thing (a receipt, a whiteboard, a label, a page
@@ -122,7 +122,7 @@ app over HTTPS (so the camera works on a phone). Full details in the
 
 ### Connect Notion (either version)
 
-1. [notion.so/my-integrations](https://www.notion.so/my-integrations) → **New
+1. [notion.com/my-integrations](https://www.notion.com/my-integrations) → **New
    integration** → **Internal** → create it.
 2. Copy the **Internal Integration Secret** (starts with `ntn_` or `secret_`).
 3. Open each database you want to use → **•••** → **Connections** → add your integration.
