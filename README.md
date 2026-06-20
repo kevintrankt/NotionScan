@@ -1,84 +1,157 @@
-# NotionScanner
+# NotionScan
 
-Take photos and upload them straight into a Notion database. A batch of photos becomes one new row (page) in Notion, with every photo attached.
+**Snap a batch of photos and push them straight into a Notion database.** A batch of
+photos becomes one new row (page) in your chosen database, with every photo attached as
+an image block. The whole loop is *open app → shoot → upload*.
 
-No backend: the app talks directly to the Notion API using your personal Internal Integration Token.
+There is **no backend of our own**: the app talks directly to the Notion API using your
+personal [internal integration token](https://www.notion.so/my-integrations). Your token
+never leaves the device except to call `api.notion.com`.
 
-## Two versions
+> **Why it exists.** Getting a real-world thing (a receipt, a whiteboard, a label, a page
+> of handwritten notes) into Notion normally means: open camera → shoot → switch to
+> Notion → find the database → make a row → attach the image. That's 6+ steps across two
+> apps, so it usually doesn't happen. NotionScan collapses it to three taps. See
+> [`PRD.md`](./PRD.md) for the full product rationale.
 
-NotionScanner comes in two flavours that share the same product and the same Notion data model:
+---
 
-| | iOS app (this folder + `NotionScan/`) | Web app ([`webapp/`](./webapp/)) |
+## What it does
+
+1. **Onboard once.** Paste your Notion integration token; the app validates it and lets
+   you pick a default destination database.
+2. **Shoot.** The app opens straight to a full-screen camera. Capture as many photos as
+   you like; each one joins the current batch.
+3. **Review & upload.** Tap **Done**, drop any bad shots, confirm the database, and
+   **Upload**. One Notion page is created with all the photos as image blocks.
+4. **Auto mode.** Flip it on to skip review entirely — every shot uploads instantly as
+   its own one-photo page.
+5. **Gallery.** A persistent, on-device gallery records every photo with its upload
+   status, lets you retry failed uploads, opens uploaded photos in Notion, and
+   multiselect-deletes (optionally deleting the Notion page too).
+
+---
+
+## Two versions, one product
+
+NotionScan ships in two flavours that share the same product and the **same Notion data
+model**. Pick whichever fits how you want to run it.
+
+| | **iOS app** | **Web app** |
 | --- | --- | --- |
+| Source | [`NotionScan/`](./NotionScan/) | [`webapp/`](./webapp/) |
 | Built with | SwiftUI + AVFoundation | Vanilla HTML/CSS/ES-module JS (no build step) |
-| Runs on | iPhone (Xcode build) | Any modern browser; deployable to **GitHub Pages** |
+| Runs on | iPhone (build & install via Xcode) | Any modern browser; deployable to **GitHub Pages** |
 | Token storage | iOS Keychain | `localStorage` |
 | Photo storage | JPEG files + JSON sidecar | IndexedDB (JPEG blobs + metadata) |
-| Talks to Notion | Directly (native apps ignore CORS) | Directly, **or** via an optional CORS proxy (Notion's API has no CORS headers) |
+| Talks to Notion | Directly (native apps ignore CORS) | Directly, **or** via an optional CORS proxy |
+| Dependencies | None (URLSession only) | None (`fetch` only) |
 
-Both have the same flow — onboarding, a camera home screen, per-batch review & upload, **Auto mode**, and a persistent gallery with upload status and retry. The web app is a faithful port of the iOS architecture; see [`webapp/README.md`](./webapp/README.md) for the full feature-parity notes, GitHub Pages deployment steps, and the one-file Cloudflare Worker that works around Notion's lack of CORS support.
+The web app is a faithful, line-for-line port of the iOS architecture — every Swift type
+has a JavaScript counterpart with the same responsibility (see the
+[parity table in the web README](./webapp/README.md#how-it-works-for-the-curious)).
 
-The rest of this document covers the **iOS app**.
-
----
-
-## Run it on your iPhone 17 Pro (from zero)
-
-You write/edit code in Cursor, but you build and install the app with **Xcode** (already installed here, version 26.2).
-
-### 1. Open the project
-
-In Finder, double-click `NotionScan.xcodeproj` (in this folder). It opens in Xcode with all files already included.
-
-### 2. Set up signing (free Apple ID is fine)
-
-1. Xcode menu -> **Settings** -> **Accounts** -> **+** -> add your Apple ID.
-2. In the left sidebar, click the blue **NotionScan** project -> select the **NotionScan** target -> **Signing & Capabilities** tab.
-3. Check **Automatically manage signing**, and set **Team** to your name (Personal Team).
-4. If you see a "bundle identifier is not available" error, change **Bundle Identifier** to something unique, e.g. `com.yourname.notionscanner`.
-
-> Note: with a free account the installed app stops working after ~7 days. Just press Run again from Xcode to refresh it.
-
-### 3. Prepare the iPhone
-
-1. Plug the iPhone into the Mac with a cable. On the phone, tap **Trust This Computer**.
-2. On the iPhone: **Settings -> Privacy & Security -> Developer Mode -> On**, then restart the phone.
-3. (After the first install, if iOS blocks the app: **Settings -> General -> VPN & Device Management** -> trust your developer certificate.)
-
-### 4. Run
-
-1. At the top of Xcode, click the device dropdown and pick your **iPhone**.
-2. Press the **Run** button (the play triangle), or Cmd+R.
-3. The app builds, installs, and launches on your phone.
+> **The web app's one catch: CORS.** The Notion API does not send CORS headers, so a
+> browser blocks a web page from calling `api.notion.com` directly. (Native iOS is
+> unaffected.) The web app therefore makes the API base URL configurable and ships two
+> ready-made proxies you can run yourself: a one-file
+> [Cloudflare Worker](./webapp/cloudflare-worker/) and a zero-dependency
+> [local Node server](./webapp/local-server/). Full details in the
+> [web README](./webapp/README.md).
 
 ---
 
-## Connect Notion (first launch, inside the app)
+## How it works (the shared core)
 
-1. Go to [notion.so/my-integrations](https://www.notion.so/my-integrations) -> **New integration** -> type **Internal** -> create it.
-2. Copy the **Internal Integration Secret** (starts with `ntn_`).
-3. In Notion, open the **database** you want to upload to -> top-right **...** -> **Connections** -> add your integration. Repeat for any database you want available in the app.
-4. In the app: paste the token, tap **Connect**, then pick your **default database**.
+Both versions follow the same flow and the same Notion data model.
 
-## Daily use
+**One batch = one Notion page.** The page title is a human-readable timestamp (e.g.
+`NotionScan 2026-06-13 14:35`) written to the database's title property, and the page
+body is one **image block per photo** in capture order.
 
-Open app -> tap the shutter to capture one or more photos -> tap **Done** -> review (delete any bad shots, pick the database) -> **Upload**. A new row appears in Notion with all the photos attached.
+**Upload sequence** (the Notion File Upload API, `Notion-Version: 2022-06-28`):
 
-The gear icon (top-left of the camera) lets you see your default database or disconnect Notion.
+1. For each photo: `POST /v1/file_uploads` → returns `{ id, upload_url }`.
+2. `POST {upload_url}` with `multipart/form-data` (field `file`, the JPEG bytes) → the
+   file's status becomes `uploaded`.
+3. After all uploads: `POST /v1/pages` with `parent.database_id`, the title property, and
+   `children` = one image block per file, each referencing
+   `{ type: "file_upload", file_upload: { id } }`.
+
+**Other endpoints:** `GET /v1/users/me` validates the token, `POST /v1/search`
+(filtered to `object: "database"`) lists the databases the integration can write to, and
+`PATCH /v1/pages/{id}` with `{ "archived": true }` deletes (trashes) a page.
+
+> **Sharing matters.** Only databases you've explicitly connected to your integration
+> (database → **•••** → **Connections** → add your integration) appear in the picker.
+> This is the most common "where are my databases?" gotcha.
 
 ---
 
-## How it works (for the curious)
+## Quick start
 
-| File | Responsibility |
-| --- | --- |
-| `NotionScanApp.swift` | App entry; shows Onboarding until connected, then the Camera. |
-| `AppSettings.swift` | Connection state (token + default database). |
-| `KeychainStore.swift` | Stores the token securely in the Keychain. |
-| `NotionClient.swift` | All Notion API calls (validate, list databases, upload file, create page). |
-| `OnboardingView.swift` | Paste token + pick default database. |
-| `CameraModel.swift` / `CameraPreviewView.swift` | AVCaptureSession + live preview. |
-| `CameraView.swift` | Camera home screen, batch capture, settings. |
-| `ReviewView.swift` | Preview batch, pick database, upload with progress. |
+### iOS
 
-See `PRD.md` for the full product spec.
+1. Open [`NotionScan.xcodeproj`](./NotionScan.xcodeproj) in Xcode.
+2. Confirm **Signing & Capabilities** uses your team (automatic signing). A free Apple ID
+   works, but the build expires ~7 days after install — just re-run from Xcode to refresh.
+3. Pick your iPhone as the run destination and press **Run** (⌘R).
+4. On first launch, paste your token and choose a default database.
+
+The full from-zero walkthrough (device setup, Developer Mode, troubleshooting) is in
+[`PLAN.md`](./PLAN.md).
+
+### Web
+
+```bash
+cd webapp
+python3 -m http.server 8000
+# open http://localhost:8000  (localhost is a secure context, which the camera requires)
+```
+
+To run it from a phone or deploy to GitHub Pages you'll also need a CORS proxy — see the
+[web README](./webapp/README.md) and [`webapp/local-server/`](./webapp/local-server/).
+
+### Connect Notion (either version)
+
+1. [notion.so/my-integrations](https://www.notion.so/my-integrations) → **New
+   integration** → **Internal** → create it.
+2. Copy the **Internal Integration Secret** (starts with `ntn_` or `secret_`).
+3. Open each database you want to use → **•••** → **Connections** → add your integration.
+4. In the app: paste the token, **Connect**, then pick your **default database**.
+
+---
+
+## Repository layout
+
+```
+NotionScan/
+├── NotionScan/              # iOS app (SwiftUI). Any .swift here auto-compiles.
+├── NotionScan.xcodeproj/    # Xcode project (signing, build settings, permissions)
+├── webapp/                  # Browser version (no build step)
+│   ├── index.html           #   entry; loads js/app.js as an ES module
+│   ├── js/                  #   app logic; one module per iOS type/screen
+│   ├── cloudflare-worker/   #   optional one-file CORS proxy
+│   └── local-server/        #   optional self-hosted Node proxy + HTTPS static host
+├── README.md                # this file
+├── AGENTS.md                # orientation guide for AI coding agents
+├── PRD.md                   # product requirements & rationale
+└── PLAN.md                  # build plan + click-by-click iOS setup guide
+```
+
+## Documentation index
+
+- **[`AGENTS.md`](./AGENTS.md)** — a concise map of the codebase, conventions, and
+  build/run commands for both humans and AI agents working in the repo.
+- **[`PRD.md`](./PRD.md)** — what the product is, who it's for, and the requirements.
+- **[`PLAN.md`](./PLAN.md)** — architecture overview and the full iOS setup walkthrough.
+- **[`webapp/README.md`](./webapp/README.md)** — web feature parity, deployment, and CORS.
+- **[`webapp/cloudflare-worker/README.md`](./webapp/cloudflare-worker/README.md)** and
+  **[`webapp/local-server/README.md`](./webapp/local-server/README.md)** — the two proxy
+  options.
+
+## Status & scope
+
+This is a **single-user, personal-use** app (v1). No OAuth, no team accounts, no App
+Store distribution, no cloud backend. The iOS project targets iPhone (the template also
+lists iPad/Vision Pro). See [`PRD.md`](./PRD.md) §5 for non-goals and §12 for future ideas.
