@@ -83,10 +83,11 @@ There is **nothing to `npm install`** — the server has no dependencies.
 
 ```bash
 git clone https://github.com/kevintrankt/NotionScan.git
-cd NotionScan
-git checkout claude/webapp-version-37e6e036c00580c0871e009219a67ad4
-cd webapp/local-server
+cd NotionScan/webapp/local-server
 ```
+
+The local server ships on the default branch (`main`), so a plain clone is all
+you need — no `git checkout` of a feature branch required.
 
 ## 3. Generate an HTTPS certificate (needed for the camera)
 
